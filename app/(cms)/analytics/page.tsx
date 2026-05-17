@@ -1,9 +1,9 @@
 export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { getDb } from "@/lib/db";
-import { getCachedPlatforms } from "@/lib/cache";
-import { contentPieces, analyticsSnapshots, contentPlatformLinks } from "@/lib/db/schema";
-import { eq, desc, inArray, sql, and } from "drizzle-orm";
+import { getCachedPlatforms, getCachedAnalyticsSnapshots } from "@/lib/cache";
+import { contentPieces } from "@/lib/db/schema";
+import { eq, desc } from "drizzle-orm";
 
 const TYPE_PILLS = [
   { value: "", label: "Alle" },
@@ -34,22 +34,10 @@ export default async function AnalyticsPage({
     return <EmptyState typeFilter={typeFilter} />;
   }
 
-  // All three queries run in parallel
-  const [snapRows, platformRows, links] = await Promise.all([
-    db.select({
-        contentId: analyticsSnapshots.contentId,
-        platformId: analyticsSnapshots.platformId,
-        views: sql<number>`MAX(${analyticsSnapshots.views})`.as("views"),
-        likes: sql<number>`MAX(${analyticsSnapshots.likes})`.as("likes"),
-        comments: sql<number>`MAX(${analyticsSnapshots.comments})`.as("comments"),
-      })
-      .from(analyticsSnapshots)
-      .where(inArray(analyticsSnapshots.contentId, ids))
-      .groupBy(analyticsSnapshots.contentId, analyticsSnapshots.platformId),
-
+  // Snapshots+links cached 5min; platforms cached 1h — both run in parallel
+  const [{ snapRows, links }, platformRows] = await Promise.all([
+    getCachedAnalyticsSnapshots(ids),
     getCachedPlatforms(),
-
-    db.select().from(contentPlatformLinks).where(inArray(contentPlatformLinks.contentId, ids)),
   ]);
 
   // Aggregate per content

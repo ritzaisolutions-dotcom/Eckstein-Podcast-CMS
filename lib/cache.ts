@@ -1,7 +1,7 @@
 import { unstable_cache } from "next/cache";
 import { getDb } from "./db";
-import { platforms, contentPieces } from "./db/schema";
-import { count, eq } from "drizzle-orm";
+import { platforms, contentPieces, analyticsSnapshots, contentPlatformLinks } from "./db/schema";
+import { count, inArray, sql } from "drizzle-orm";
 
 // Platform rows never change at runtime — cache for 1 hour
 export const getCachedPlatforms = unstable_cache(
@@ -12,6 +12,33 @@ export const getCachedPlatforms = unstable_cache(
   ["platforms"],
   { revalidate: 3600, tags: ["platforms"] }
 );
+
+// Analytics snapshot aggregates — snapshots are pulled every 6h, so 5min cache is fine.
+// Keyed by a sorted list of content IDs so different filter combinations get their own entry.
+export function getCachedAnalyticsSnapshots(ids: string[]) {
+  const key = [...ids].sort().join(",");
+  return unstable_cache(
+    async () => {
+      const db = getDb();
+      const [snapRows, links] = await Promise.all([
+        db.select({
+            contentId: analyticsSnapshots.contentId,
+            platformId: analyticsSnapshots.platformId,
+            views: sql<number>`MAX(${analyticsSnapshots.views})`.as("views"),
+            likes: sql<number>`MAX(${analyticsSnapshots.likes})`.as("likes"),
+            comments: sql<number>`MAX(${analyticsSnapshots.comments})`.as("comments"),
+          })
+          .from(analyticsSnapshots)
+          .where(inArray(analyticsSnapshots.contentId, ids))
+          .groupBy(analyticsSnapshots.contentId, analyticsSnapshots.platformId),
+        db.select().from(contentPlatformLinks).where(inArray(contentPlatformLinks.contentId, ids)),
+      ]);
+      return { snapRows, links };
+    },
+    [`analytics-snaps-${key}`],
+    { revalidate: 300, tags: ["analytics-snapshots"] }
+  )();
+}
 
 // Content counts by type — used on dashboard, cache 60s
 export const getCachedContentCounts = unstable_cache(

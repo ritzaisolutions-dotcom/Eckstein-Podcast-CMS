@@ -8,10 +8,9 @@ export function getDb() {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL is not set");
   if (!_client) {
-    // prepare: false required for Supabase Transaction pooler (PgBouncer)
-    // max:10 — Supabase Transaction pooler supports concurrent connections
-    // prepare:false required for PgBouncer transaction mode
-    _client = postgres(url, { ssl: "require", max: 10, prepare: false, idle_timeout: 20, connect_timeout: 10 });
+    // Session pooler (port 5432) — lower latency than transaction pooler (6543)
+    // prepare:false still needed; idle_timeout keeps connections warm between requests
+    _client = postgres(url, { ssl: "require", max: 10, prepare: false, idle_timeout: 30, connect_timeout: 10 });
   }
   return drizzle(_client, { schema });
 }
