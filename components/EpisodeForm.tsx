@@ -145,7 +145,7 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
     setPlatformLinks({});
   }
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
     setSaving(true);
@@ -179,8 +179,8 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
         return;
       }
 
-      const data = await res.json();
-      router.push(`/content/${episodeId ?? data.id}`);
+      await res.json();
+      router.push(episodeId ? `/episodes/${episodeId}` : `/content`);
       router.refresh();
     } catch {
       setError("Netzwerkfehler — bitte erneut versuchen");
