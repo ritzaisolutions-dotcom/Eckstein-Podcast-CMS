@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 
 interface NavItem {
@@ -12,18 +13,16 @@ interface NavItem {
 
 const NAV_MAIN: NavItem[] = [
   { href: "/", label: "OHE", icon: "◈" },
-  { href: "/episodes", label: "Episoden", icon: "▶" },
-  { href: "/prep", label: "Episode Prep", icon: "◎" },
-  { href: "/shorts", label: "Shorts", icon: "⬡" },
+  { href: "/content", label: "Content", icon: "▤" },
+  { href: "/analytics", label: "Analytics", icon: "◎" },
+  { href: "/prep", label: "Episode Prep", icon: "◉" },
   { href: "/newsletter", label: "Das Fundament", icon: "✦" },
-  { href: "/posts", label: "Social Posts", icon: "◇" },
-  { href: "/articles", label: "Artikel", icon: "❧" },
-  { href: "/mind-dump", label: "Mind Dump", icon: "⊕" },
+  { href: "/mind-dump", label: "Ideen & Topics", icon: "⊕" },
 ];
 
 const NAV_BOTTOM: NavItem[] = [
   { href: "/media", label: "Media Library", icon: "◫" },
-  { href: "/guests", label: "Gäste", icon: "◉" },
+  { href: "/guests", label: "Gäste", icon: "◎" },
   { href: "/vault", label: "Vault", icon: "⬘" },
   { href: "/settings", label: "Einstellungen", icon: "◌" },
 ];
@@ -81,14 +80,16 @@ export default function Sidebar() {
         }}
       >
         {/* Logo */}
-        <div className="px-4 py-5 border-b" style={{ borderColor: "var(--border)" }}>
+        <div className="px-4 py-4 border-b" style={{ borderColor: "var(--border)" }}>
           <Link href="/" className="flex items-center gap-2.5">
-            <div
-              className="w-7 h-7 rounded-full flex items-center justify-center text-xs shrink-0"
-              style={{ background: "var(--navy)", color: "var(--gold)" }}
-            >
-              ✦
-            </div>
+            <Image
+              src="/brand/logo.png"
+              alt="Eckstein Podcast"
+              width={32}
+              height={32}
+              className="shrink-0 rounded-sm"
+              style={{ objectFit: "contain" }}
+            />
             <div>
               <div
                 className="text-sm tracking-[0.12em] uppercase leading-none"
@@ -138,7 +139,7 @@ export default function Sidebar() {
         className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around px-2 py-1 border-t"
         style={{ background: "var(--bg-surface)", borderColor: "var(--border)" }}
       >
-        {[...NAV_MAIN.slice(0, 5), NAV_BOTTOM[0]].map(item => (
+        {[NAV_MAIN[0], NAV_MAIN[1], NAV_MAIN[2], NAV_MAIN[3], NAV_BOTTOM[0]].map(item => (
           <Link
             key={item.href}
             href={item.href}

@@ -1,4 +1,5 @@
 import Sidebar from "@/components/Sidebar";
+import CommandPalette from "@/components/CommandPalette";
 
 export default function CmsLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -7,6 +8,7 @@ export default function CmsLayout({ children }: { children: React.ReactNode }) {
       <main className="flex-1 min-w-0 pb-20 md:pb-0">
         {children}
       </main>
+      <CommandPalette />
     </div>
   );
 }

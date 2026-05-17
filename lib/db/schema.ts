@@ -27,6 +27,7 @@ export const contentPieces = pgTable("content_pieces", {
   parentId: text("parent_id"),
   guestId: text("guest_id"),
   status: text("status").notNull().default("draft"), // 'draft' | 'scheduled' | 'published'
+  lifecycleStage: text("lifecycle_stage").notNull().default("idea"), // 'idea' | 'production' | 'editing' | 'scheduled' | 'published'
   createdBy: text("created_by").notNull().default("kevin"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   uploadDate: timestamp("upload_date"),
