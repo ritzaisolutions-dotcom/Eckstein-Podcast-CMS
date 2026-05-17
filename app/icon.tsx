@@ -13,7 +13,7 @@ export default function Icon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#f5eed8",
+          background: "#05101f",
         }}
       >
         <svg width="32" height="32" viewBox="0 0 32 32" fill="none">

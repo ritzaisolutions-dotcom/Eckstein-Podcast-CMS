@@ -4,7 +4,7 @@ import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { getCachedPlatforms, getCachedContentCounts } from "@/lib/cache";
 import { contentPieces, contentPlatformLinks, episodeTasks, clipQueue, forumThreads, analyticsSnapshots } from "@/lib/db/schema";
-import { eq, and, lte, isNull, isNotNull, count, desc, gte, inArray } from "drizzle-orm";
+import { eq, and, lte, isNull, isNotNull, count, desc, gte, inArray, or } from "drizzle-orm";
 
 const WOCHENTAGE = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 const MONATE = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
@@ -64,22 +64,32 @@ export default async function OheDashboard() {
     // Platform labels (cached 1h)
     getCachedPlatforms(),
 
-    // Diese Woche
+    // Diese Woche — geplante Posts + Drehs
     db.select({
-        contentId: contentPlatformLinks.contentId,
+        id: contentPieces.id,
         title: contentPieces.title,
         episodeNumber: contentPieces.episodeNumber,
+        filmingDate: contentPieces.filmingDate,
+        lifecycleStage: contentPieces.lifecycleStage,
         scheduledAt: contentPlatformLinks.scheduledAt,
       })
-      .from(contentPlatformLinks)
-      .innerJoin(contentPieces, eq(contentPlatformLinks.contentId, contentPieces.id))
-      .where(and(
-        isNull(contentPlatformLinks.postedAt),
-        isNotNull(contentPlatformLinks.scheduledAt),
-        gte(contentPlatformLinks.scheduledAt, new Date(todayStr + "T00:00:00Z")),
-        lte(contentPlatformLinks.scheduledAt, weekLater),
+      .from(contentPieces)
+      .leftJoin(contentPlatformLinks, eq(contentPlatformLinks.contentId, contentPieces.id))
+      .where(or(
+        and(
+          isNull(contentPlatformLinks.postedAt),
+          isNotNull(contentPlatformLinks.scheduledAt),
+          gte(contentPlatformLinks.scheduledAt, new Date(todayStr + "T00:00:00Z")),
+          lte(contentPlatformLinks.scheduledAt, weekLater),
+        ),
+        and(
+          eq(contentPieces.lifecycleStage, "filming"),
+          isNotNull(contentPieces.filmingDate),
+          gte(contentPieces.filmingDate, new Date(todayStr + "T00:00:00Z")),
+          lte(contentPieces.filmingDate, weekLater),
+        ),
       ))
-      .limit(5),
+      .limit(8),
 
     // Nächste Episode
     db.select()
@@ -257,18 +267,27 @@ export default async function OheDashboard() {
             <p className="text-sm" style={{ color: "var(--text-muted)", fontStyle: "italic" }}>Nichts geplant diese Woche</p>
           ) : (
             <ul className="flex flex-col gap-2">
-              {dueWeekLinks.map((item, i) => (
-                <li key={i}>
-                  <Link href="/content" className="text-sm hover:underline" style={{ color: "var(--text-secondary)", fontFamily: "var(--font-eb-garamond)" }}>
-                    → {item.episodeNumber ? `Ep.${item.episodeNumber}` : item.title}
-                    {item.scheduledAt && (
-                      <span className="ml-2 text-xs" style={{ color: "var(--text-muted)" }}>
-                        {new Date(item.scheduledAt).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}
+              {dueWeekLinks.map((item, i) => {
+                const isFilming = item.lifecycleStage === "filming" && item.filmingDate;
+                const date = isFilming ? item.filmingDate : item.scheduledAt;
+                return (
+                  <li key={i} className="flex items-center gap-2">
+                    {isFilming && (
+                      <span className="text-xs px-1.5 py-0.5 rounded shrink-0" style={{ background: "rgba(201,168,76,0.15)", color: "var(--gold)", fontFamily: "var(--font-cinzel)", fontSize: "0.52rem", letterSpacing: "0.07em" }}>
+                        DREH
                       </span>
                     )}
-                  </Link>
-                </li>
-              ))}
+                    <Link href={`/content/${item.id}`} className="text-sm hover:underline flex-1" style={{ color: "var(--text-secondary)", fontFamily: "var(--font-eb-garamond)" }}>
+                      {item.episodeNumber ? `Ep.${item.episodeNumber}` : item.title}
+                    </Link>
+                    {date && (
+                      <span className="text-xs shrink-0" style={{ color: "var(--text-muted)" }}>
+                        {new Date(date).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </section>

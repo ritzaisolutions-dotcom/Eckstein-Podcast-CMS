@@ -22,15 +22,6 @@ const PLATFORMS_BY_TYPE: Record<string, { slug: string; label: string; color: st
     { slug: "x",        label: "X",        color: "#05101f", bg: "rgba(12,30,53,0.08)" },
     { slug: "website",  label: "Website",  color: "#05101f", bg: "rgba(12,30,53,0.06)" },
   ],
-  newsletter: [
-    { slug: "substack", label: "Substack", color: "#c9a84c", bg: "rgba(201,168,76,0.12)" },
-  ],
-  social_post: [
-    { slug: "instagram", label: "Instagram", color: "#c9a84c", bg: "rgba(201,168,76,0.1)" },
-    { slug: "x",         label: "X",         color: "#05101f", bg: "rgba(12,30,53,0.08)" },
-    { slug: "tiktok",    label: "TikTok",    color: "#05101f", bg: "rgba(12,30,53,0.08)" },
-  ],
-  media: [],
 };
 
 const PLACEHOLDER_URL: Record<string, string> = {
@@ -47,20 +38,19 @@ const PLACEHOLDER_URL: Record<string, string> = {
 };
 
 const CONTENT_TYPE_OPTIONS = [
-  { value: "lfc",         label: "LFC — Long-Form" },
-  { value: "sfc",         label: "SFC — Shorts" },
-  { value: "article",     label: "Artikel" },
-  { value: "newsletter",  label: "Newsletter" },
-  { value: "social_post", label: "Social Post" },
-  { value: "media",       label: "Media" },
+  { value: "lfc",     label: "LFC — Long Form Content" },
+  { value: "sfc",     label: "SFC — Short Form Content" },
+  { value: "article", label: "Article — Das Fundament" },
 ];
 
-// Lifecycle stages for this CMS
-const LIFECYCLE_OPTIONS = [
-  { value: "idea",       label: "Idee" },
-  { value: "production", label: "Dreh" },
-  { value: "editing",    label: "Schnitt" },
-  { value: "published",  label: "Live" },
+// Lifecycle stages — each stage can optionally carry a date
+const LIFECYCLE_OPTIONS: { value: string; label: string; dateLabel?: string }[] = [
+  { value: "draft",     label: "Draft" },
+  { value: "scripting", label: "Scripting" },
+  { value: "filming",   label: "Filming",  dateLabel: "Drehdatum" },
+  { value: "editing",   label: "Editing" },
+  { value: "revision",  label: "Revision" },
+  { value: "live",      label: "Live",     dateLabel: "Geplantes Datum" },
 ];
 
 interface PlatformLink {
@@ -76,11 +66,14 @@ interface EpisodeFormProps {
 
 export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
   const [contentType, setContentType] = useState("lfc");
-  const [lifecycleStage, setLifecycleStage] = useState("idea");
+  const [lifecycleStage, setLifecycleStage] = useState("draft");
+  const [stageDates, setStageDates] = useState<Record<string, string>>({});
   const [selectedPlatforms, setSelectedPlatforms] = useState<Set<string>>(new Set());
   const [platformLinks, setPlatformLinks] = useState<Record<string, PlatformLink>>({});
   const [uploadDate, setUploadDate] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const currentStageConfig = LIFECYCLE_OPTIONS.find(o => o.value === lifecycleStage);
 
   const availablePlatforms = PLATFORMS_BY_TYPE[contentType] ?? [];
 
@@ -152,6 +145,24 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
                 </button>
               ))}
             </div>
+            {currentStageConfig?.dateLabel && (
+              <div className="mt-2">
+                <label className="cms-label">{currentStageConfig.dateLabel}</label>
+                <input
+                  type="datetime-local"
+                  step="60"
+                  className="cms-input"
+                  value={stageDates[lifecycleStage] ?? ""}
+                  onChange={e => setStageDates(prev => ({ ...prev, [lifecycleStage]: e.target.value }))}
+                  style={{ maxWidth: 260 }}
+                />
+                {stageDates[lifecycleStage] && (
+                  <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                    {new Date(stageDates[lifecycleStage]).toLocaleString("de-DE", { weekday: "long", day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
