@@ -25,108 +25,121 @@ export default async function OheDashboard() {
   const todayStr = today.toISOString().split("T")[0];
   const weekLater = new Date(today);
   weekLater.setDate(today.getDate() + 7);
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-  // --- Content Counts ---
-  const typeCounts = await db
-    .select({ type: contentPieces.type, cnt: count() })
-    .from(contentPieces)
-    .groupBy(contentPieces.type);
+  // All independent queries run in parallel
+  const [
+    typeCounts,
+    dueTodayLinks,
+    platformRows,
+    dueWeekLinks,
+    nextEp,
+    recentEps,
+    openClipsCount,
+    newIdeas,
+    latestPublished,
+  ] = await Promise.all([
+    // Content counts per type
+    db.select({ type: contentPieces.type, cnt: count() })
+      .from(contentPieces)
+      .groupBy(contentPieces.type),
 
-  const totalCount = typeCounts.reduce((s, r) => s + Number(r.cnt), 0);
-  const countByType = Object.fromEntries(typeCounts.map(r => [r.type, Number(r.cnt)]));
-
-  // --- Heute fällig ---
-  const dueTodayLinks = await db
-    .select({
-      contentId: contentPlatformLinks.contentId,
-      platformId: contentPlatformLinks.platformId,
-      scheduledAt: contentPlatformLinks.scheduledAt,
-      title: contentPieces.title,
-      episodeNumber: contentPieces.episodeNumber,
-      type: contentPieces.type,
-    })
-    .from(contentPlatformLinks)
-    .innerJoin(contentPieces, eq(contentPlatformLinks.contentId, contentPieces.id))
-    .where(
-      and(
+    // Heute fällig
+    db.select({
+        contentId: contentPlatformLinks.contentId,
+        platformId: contentPlatformLinks.platformId,
+        scheduledAt: contentPlatformLinks.scheduledAt,
+        title: contentPieces.title,
+        episodeNumber: contentPieces.episodeNumber,
+        type: contentPieces.type,
+      })
+      .from(contentPlatformLinks)
+      .innerJoin(contentPieces, eq(contentPlatformLinks.contentId, contentPieces.id))
+      .where(and(
         isNull(contentPlatformLinks.postedAt),
         isNotNull(contentPlatformLinks.scheduledAt),
         lte(contentPlatformLinks.scheduledAt, new Date(todayStr + "T23:59:59Z")),
-      )
-    )
-    .limit(8);
+      ))
+      .limit(8),
 
-  // --- Platform slugs for due items ---
-  const platformRows = await db.select().from(platforms);
-  const platformMap = Object.fromEntries(platformRows.map(p => [p.id, p.slug]));
+    // Platform labels
+    db.select().from(platforms),
 
-  // --- Diese Woche (scheduled in next 7 days, not today) ---
-  const dueWeekLinks = await db
-    .select({
-      contentId: contentPlatformLinks.contentId,
-      title: contentPieces.title,
-      episodeNumber: contentPieces.episodeNumber,
-      scheduledAt: contentPlatformLinks.scheduledAt,
-    })
-    .from(contentPlatformLinks)
-    .innerJoin(contentPieces, eq(contentPlatformLinks.contentId, contentPieces.id))
-    .where(
-      and(
+    // Diese Woche
+    db.select({
+        contentId: contentPlatformLinks.contentId,
+        title: contentPieces.title,
+        episodeNumber: contentPieces.episodeNumber,
+        scheduledAt: contentPlatformLinks.scheduledAt,
+      })
+      .from(contentPlatformLinks)
+      .innerJoin(contentPieces, eq(contentPlatformLinks.contentId, contentPieces.id))
+      .where(and(
         isNull(contentPlatformLinks.postedAt),
         isNotNull(contentPlatformLinks.scheduledAt),
         gte(contentPlatformLinks.scheduledAt, new Date(todayStr + "T00:00:00Z")),
         lte(contentPlatformLinks.scheduledAt, weekLater),
-      )
-    )
-    .limit(5);
+      ))
+      .limit(5),
 
-  // --- Nächste Episode ---
-  const nextEp = await db
-    .select()
-    .from(contentPieces)
-    .where(and(eq(contentPieces.type, "lfc"), eq(contentPieces.status, "scheduled")))
-    .orderBy(contentPieces.uploadDate)
-    .limit(1);
+    // Nächste Episode
+    db.select()
+      .from(contentPieces)
+      .where(and(eq(contentPieces.type, "lfc"), eq(contentPieces.status, "scheduled")))
+      .orderBy(contentPieces.uploadDate)
+      .limit(1),
 
-  // --- Episode Ampel (recent published + scheduled LFCs) ---
-  const recentEps = await db
-    .select()
-    .from(contentPieces)
-    .where(eq(contentPieces.type, "lfc"))
-    .orderBy(desc(contentPieces.createdAt))
-    .limit(4);
+    // Recent LFCs for Ampel
+    db.select()
+      .from(contentPieces)
+      .where(eq(contentPieces.type, "lfc"))
+      .orderBy(desc(contentPieces.createdAt))
+      .limit(4),
 
-  const epAmpeln: { id: string; title: string; number: number | null; done: number; total: number }[] = [];
-  for (const ep of recentEps) {
-    const tasks = await db.select().from(episodeTasks).where(eq(episodeTasks.contentId, ep.id));
-    if (tasks.length > 0) {
-      epAmpeln.push({ id: ep.id, title: ep.title, number: ep.episodeNumber, done: tasks.filter(t => t.done).length, total: tasks.length });
-    }
-  }
+    // Open clips count
+    db.select({ cnt: count() })
+      .from(clipQueue)
+      .where(inArray(clipQueue.status, ["timestamp_marked", "caption_ready"])),
 
-  // --- Open Clips ---
-  const openClipsCount = await db
-    .select({ cnt: count() })
-    .from(clipQueue)
-    .where(inArray(clipQueue.status, ["timestamp_marked", "caption_ready"]));
+    // Neue Ideen
+    db.select({ cnt: count() })
+      .from(forumThreads)
+      .where(gte(forumThreads.createdAt, weekAgo)),
+
+    // Latest published episode for KPI
+    db.select()
+      .from(contentPieces)
+      .where(and(eq(contentPieces.type, "lfc"), eq(contentPieces.status, "published")))
+      .orderBy(desc(contentPieces.uploadDate))
+      .limit(1),
+  ]);
+
+  const totalCount = typeCounts.reduce((s, r) => s + Number(r.cnt), 0);
+  const countByType = Object.fromEntries(typeCounts.map(r => [r.type, Number(r.cnt)]));
+  const platformMap = Object.fromEntries(platformRows.map(p => [p.id, p.slug]));
   const openClips = Number(openClipsCount[0]?.cnt ?? 0);
-
-  // --- Neue Ideen ---
-  const newIdeas = await db
-    .select({ cnt: count() })
-    .from(forumThreads)
-    .where(gte(forumThreads.createdAt, new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)));
   const newIdeasCount = Number(newIdeas[0]?.cnt ?? 0);
 
-  // --- Top KPI: latest published episode views ---
-  let kpiBlock: { title: string; number: number | null; views: number; prevViews: number } | null = null;
-  const latestPublished = await db
-    .select()
-    .from(contentPieces)
-    .where(and(eq(contentPieces.type, "lfc"), eq(contentPieces.status, "published")))
-    .orderBy(desc(contentPieces.uploadDate))
-    .limit(1);
+  // Episode Ampel — single query for all episodes (no N+1)
+  const recentEpIds = recentEps.map(e => e.id);
+  const allTasks = recentEpIds.length > 0
+    ? await db.select().from(episodeTasks).where(inArray(episodeTasks.contentId, recentEpIds))
+    : [];
+  const tasksByEp: Record<string, typeof allTasks> = {};
+  for (const t of allTasks) {
+    if (!tasksByEp[t.contentId]) tasksByEp[t.contentId] = [];
+    tasksByEp[t.contentId].push(t);
+  }
+  const epAmpeln = recentEps
+    .map(ep => {
+      const tasks = tasksByEp[ep.id] ?? [];
+      if (tasks.length === 0) return null;
+      return { id: ep.id, title: ep.title, number: ep.episodeNumber, done: tasks.filter(t => t.done).length, total: tasks.length };
+    })
+    .filter(Boolean) as { id: string; title: string; number: number | null; done: number; total: number }[];
 
+  // KPI block — snapshot query only if we have an episode
+  let kpiBlock: { title: string; number: number | null; views: number; prevViews: number } | null = null;
   if (latestPublished.length > 0) {
     const ep = latestPublished[0];
     const snapshots = await db
@@ -135,9 +148,7 @@ export default async function OheDashboard() {
       .where(eq(analyticsSnapshots.contentId, ep.id))
       .orderBy(desc(analyticsSnapshots.capturedAt))
       .limit(2);
-    const latest = snapshots[0]?.views ?? 0;
-    const prev = snapshots[1]?.views ?? 0;
-    kpiBlock = { title: ep.title, number: ep.episodeNumber, views: latest, prevViews: prev };
+    kpiBlock = { title: ep.title, number: ep.episodeNumber, views: snapshots[0]?.views ?? 0, prevViews: snapshots[1]?.views ?? 0 };
   }
 
   // --- Format helpers ---

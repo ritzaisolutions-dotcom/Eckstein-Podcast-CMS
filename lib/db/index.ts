@@ -9,7 +9,9 @@ export function getDb() {
   if (!url) throw new Error("DATABASE_URL is not set");
   if (!_client) {
     // prepare: false required for Supabase Transaction pooler (PgBouncer)
-    _client = postgres(url, { ssl: "require", max: 1, prepare: false });
+    // max:10 — Supabase Transaction pooler supports concurrent connections
+    // prepare:false required for PgBouncer transaction mode
+    _client = postgres(url, { ssl: "require", max: 10, prepare: false, idle_timeout: 20, connect_timeout: 10 });
   }
   return drizzle(_client, { schema });
 }

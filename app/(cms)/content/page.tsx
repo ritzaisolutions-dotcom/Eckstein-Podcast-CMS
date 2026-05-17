@@ -38,41 +38,41 @@ export default async function ContentPage({
   if (statusFilter) conditions.push(eq(contentPieces.status, statusFilter));
   if (query) conditions.push(ilike(contentPieces.title, `%${query}%`));
 
-  const pieces = await db
-    .select()
-    .from(contentPieces)
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(desc(contentPieces.createdAt))
-    .limit(100);
+  // Pieces + platform rows in parallel (pieces needed for ids, platform rows independent)
+  const [pieces, platformRows] = await Promise.all([
+    db.select()
+      .from(contentPieces)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(contentPieces.createdAt))
+      .limit(100),
+    db.select().from(platforms),
+  ]);
 
-  // Get platform links for all pieces
   const ids = pieces.map(p => p.id);
-  const links = ids.length > 0
-    ? await db.select().from(contentPlatformLinks).where(inArray(contentPlatformLinks.contentId, ids))
-    : [];
+  const platformMap = Object.fromEntries(platformRows.map(p => [p.id, p.slug]));
 
-  // Get latest analytics snapshot per content piece (sum across platforms)
-  const snapshots = ids.length > 0
-    ? await db
-        .select({
-          contentId: analyticsSnapshots.contentId,
-          views: sql<number>`SUM(${analyticsSnapshots.views})`.as("views"),
-        })
-        .from(analyticsSnapshots)
-        .where(inArray(analyticsSnapshots.contentId, ids))
-        .groupBy(analyticsSnapshots.contentId)
-    : [];
+  // Platform links + snapshots in parallel (both depend on ids)
+  const [links, snapshots] = ids.length > 0
+    ? await Promise.all([
+        db.select().from(contentPlatformLinks).where(inArray(contentPlatformLinks.contentId, ids)),
+        db.select({
+            contentId: analyticsSnapshots.contentId,
+            views: sql<number>`SUM(${analyticsSnapshots.views})`.as("views"),
+          })
+          .from(analyticsSnapshots)
+          .where(inArray(analyticsSnapshots.contentId, ids))
+          .groupBy(analyticsSnapshots.contentId),
+      ])
+    : [[], []];
 
   const viewsMap = Object.fromEntries(snapshots.map(s => [s.contentId, Number(s.views)]));
 
-  // Platform rows for labels
-  const platformRows = await db.select().from(platforms);
   const platformByContentId: Record<string, string[]> = {};
   for (const link of links) {
-    const p = platformRows.find(r => r.id === link.platformId);
-    if (p) {
+    const slug = platformMap[link.platformId];
+    if (slug) {
       if (!platformByContentId[link.contentId]) platformByContentId[link.contentId] = [];
-      platformByContentId[link.contentId].push(p.slug);
+      platformByContentId[link.contentId].push(slug);
     }
   }
 

@@ -33,18 +33,23 @@ export default async function AnalyticsPage({
     return <EmptyState typeFilter={typeFilter} />;
   }
 
-  // Latest snapshot per content+platform
-  const snapRows = await db
-    .select({
-      contentId: analyticsSnapshots.contentId,
-      platformId: analyticsSnapshots.platformId,
-      views: sql<number>`MAX(${analyticsSnapshots.views})`.as("views"),
-      likes: sql<number>`MAX(${analyticsSnapshots.likes})`.as("likes"),
-      comments: sql<number>`MAX(${analyticsSnapshots.comments})`.as("comments"),
-    })
-    .from(analyticsSnapshots)
-    .where(inArray(analyticsSnapshots.contentId, ids))
-    .groupBy(analyticsSnapshots.contentId, analyticsSnapshots.platformId);
+  // All three queries run in parallel
+  const [snapRows, platformRows, links] = await Promise.all([
+    db.select({
+        contentId: analyticsSnapshots.contentId,
+        platformId: analyticsSnapshots.platformId,
+        views: sql<number>`MAX(${analyticsSnapshots.views})`.as("views"),
+        likes: sql<number>`MAX(${analyticsSnapshots.likes})`.as("likes"),
+        comments: sql<number>`MAX(${analyticsSnapshots.comments})`.as("comments"),
+      })
+      .from(analyticsSnapshots)
+      .where(inArray(analyticsSnapshots.contentId, ids))
+      .groupBy(analyticsSnapshots.contentId, analyticsSnapshots.platformId),
+
+    db.select().from(platforms),
+
+    db.select().from(contentPlatformLinks).where(inArray(contentPlatformLinks.contentId, ids)),
+  ]);
 
   // Aggregate per content
   const aggregated: Record<string, { views: number; likes: number; comments: number; byPlatform: Record<number, { views: number; likes: number }> }> = {};
@@ -56,12 +61,7 @@ export default async function AnalyticsPage({
     aggregated[row.contentId].byPlatform[row.platformId] = { views: Number(row.views ?? 0), likes: Number(row.likes ?? 0) };
   }
 
-  // Platform labels
-  const platformRows = await db.select().from(platforms);
   const platformMap = Object.fromEntries(platformRows.map(p => [p.id, p.slug]));
-
-  // Platform links per content
-  const links = await db.select().from(contentPlatformLinks).where(inArray(contentPlatformLinks.contentId, ids));
   const linkedPlatforms: Record<string, number[]> = {};
   for (const l of links) {
     if (!linkedPlatforms[l.contentId]) linkedPlatforms[l.contentId] = [];
