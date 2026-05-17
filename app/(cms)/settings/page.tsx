@@ -11,12 +11,22 @@ export default function SettingsPage() {
         <section className="cms-card flex flex-col gap-4">
           <h2 className="cms-card-title">Passwort ändern</h2>
           <p className="text-sm" style={{ color: "var(--text-muted)", fontStyle: "italic", fontFamily: "var(--font-eb-garamond)" }}>
-            Das Passwort wird als <code>ADMIN_PASSWORD</code> Cloudflare Worker Secret gesetzt. Änderung erfordert <code>wrangler secret put ADMIN_PASSWORD</code>.
+            Das Passwort wird als <code>ADMIN_PASSWORD</code> Vercel Environment Variable gesetzt.
+            Änderung im Vercel Dashboard unter <strong>Settings → Environment Variables</strong>.
           </p>
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2">
             <code className="text-xs px-3 py-2 rounded" style={{ background: "var(--bg-surface-2)", color: "var(--text-secondary)", fontFamily: "monospace" }}>
-              wrangler secret put ADMIN_PASSWORD
+              ADMIN_PASSWORD=neues-passwort
             </code>
+            <a
+              href="https://vercel.com/ritzaisolutions-dotcom/eckstein-podcast-cms/settings/environment-variables"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs"
+              style={{ color: "var(--gold)" }}
+            >
+              Vercel Dashboard → Environment Variables ↗
+            </a>
           </div>
         </section>
 

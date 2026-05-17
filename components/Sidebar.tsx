@@ -11,7 +11,7 @@ interface NavItem {
 }
 
 const NAV_MAIN: NavItem[] = [
-  { href: "/", label: "OHE", icon: "◈" },
+  { href: "/", label: "Dashboard", icon: "◈" },
   { href: "/content", label: "Content", icon: "▤" },
   { href: "/analytics", label: "Analytics", icon: "◎" },
   { href: "/prep", label: "Episode Prep", icon: "◉" },
@@ -27,17 +27,8 @@ const NAV_BOTTOM: NavItem[] = [
 ];
 
 function NavLink({ item, active }: { item: NavItem; active: boolean }) {
-  return (
-    <Link
-      href={item.href}
-      className="flex items-center gap-3 px-3 py-2 rounded-sm transition-all text-sm group relative"
-      style={{
-        background: active ? "rgba(201,168,76,0.12)" : "transparent",
-        color: active ? "var(--navy)" : "var(--text-secondary)",
-        fontFamily: "var(--font-eb-garamond)",
-        borderLeft: active ? "3px solid var(--gold)" : "3px solid transparent",
-      }}
-    >
+  const inner = (
+    <>
       <span style={{ color: active ? "var(--gold)" : "rgba(12,30,53,0.4)", fontSize: "0.8rem" }}>
         {item.icon}
       </span>
@@ -50,6 +41,27 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
           {item.badge}
         </span>
       )}
+    </>
+  );
+
+  const sharedStyle = {
+    background: active ? "rgba(201,168,76,0.12)" : "transparent",
+    color: active ? "var(--navy)" : "var(--text-secondary)",
+    fontFamily: "var(--font-eb-garamond)",
+    borderLeft: active ? "3px solid var(--gold)" : "3px solid transparent",
+  };
+
+  if (active) {
+    return (
+      <span className="flex items-center gap-3 px-3 py-2 rounded-sm text-sm" style={sharedStyle}>
+        {inner}
+      </span>
+    );
+  }
+
+  return (
+    <Link href={item.href} className="flex items-center gap-3 px-3 py-2 rounded-sm transition-all text-sm" style={sharedStyle}>
+      {inner}
     </Link>
   );
 }

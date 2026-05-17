@@ -150,9 +150,9 @@ export default async function OheDashboard() {
     <div className="px-4 md:px-8 py-6 max-w-5xl mx-auto">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl tracking-tight" style={{ fontFamily: "var(--font-cinzel)", color: "var(--navy)" }}>OHE</h1>
+        <h1 className="text-2xl tracking-tight" style={{ fontFamily: "var(--font-cinzel)", color: "var(--navy)" }}>Dashboard</h1>
         <p className="text-sm mt-0.5" style={{ fontFamily: "var(--font-eb-garamond)", color: "var(--text-muted)", fontStyle: "italic" }}>
-          {formatDate(today)} · Offene · Heute · Everything
+          {formatDate(today)}
         </p>
       </div>
 
