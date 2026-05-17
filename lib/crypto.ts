@@ -1,4 +1,6 @@
 // AES-256-GCM encryption using Web Crypto API (Cloudflare Workers compatible)
+// encryptPacked / decryptPacked store salt+iv+ciphertext in a single Uint8Array,
+// making each encrypted field self-contained (no separate salt/iv columns needed).
 
 const PBKDF2_ITERATIONS = 100_000;
 
@@ -49,4 +51,28 @@ export async function decrypt(ciphertext: ArrayBuffer, salt: Uint8Array, iv: Uin
     ciphertext,
   );
   return new TextDecoder().decode(plainBuffer);
+}
+
+// Self-contained format: [16 bytes salt][12 bytes iv][ciphertext...]
+export async function encryptPacked(plaintext: string, masterKey: string): Promise<Uint8Array> {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await deriveKey(masterKey, salt);
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: buf(iv) },
+    key,
+    buf(new TextEncoder().encode(plaintext)),
+  );
+  const packed = new Uint8Array(16 + 12 + ciphertext.byteLength);
+  packed.set(salt, 0);
+  packed.set(iv, 16);
+  packed.set(new Uint8Array(ciphertext), 28);
+  return packed;
+}
+
+export async function decryptPacked(packed: Uint8Array, masterKey: string): Promise<string> {
+  const salt = packed.slice(0, 16);
+  const iv = packed.slice(16, 28);
+  const ciphertext = packed.slice(28);
+  return decrypt(buf(ciphertext), salt, iv, masterKey);
 }

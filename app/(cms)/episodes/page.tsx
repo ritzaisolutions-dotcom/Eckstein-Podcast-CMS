@@ -16,11 +16,7 @@ const PLATFORM_STATUS = [
   { slug: "spotify", label: "Spotify" },
 ];
 
-export default function EpisodesPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ status?: string; q?: string; sort?: string }>;
-}) {
+export default function EpisodesPage() {
   return (
     <div className="px-4 md:px-8 py-6 max-w-6xl mx-auto">
       <PageHeader

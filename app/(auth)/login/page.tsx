@@ -18,6 +18,7 @@ async function loginAction(password: string): Promise<{ error?: string }> {
 function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [logoFailed, setLogoFailed] = useState(false);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -42,16 +43,20 @@ function LoginForm() {
       <div className="w-full max-w-sm flex flex-col items-center gap-8">
         {/* Logo */}
         <div className="flex flex-col items-center gap-3">
-          <div className="w-24 h-24 rounded-full border border-gold/30 flex items-center justify-center overflow-hidden">
-            <Image
-              src="/brand/logo-master-navy.png"
-              alt="Eckstein Podcast"
-              width={96}
-              height={96}
-              priority
-              className="w-full h-full object-cover"
-              onError={() => {}}
-            />
+          <div className="w-24 h-24 rounded-full border flex items-center justify-center overflow-hidden" style={{ borderColor: "rgba(201,168,76,0.3)" }}>
+            {logoFailed ? (
+              <span style={{ fontFamily: "var(--font-cinzel)", color: "var(--gold)", fontSize: "2rem", letterSpacing: "0.05em" }}>E</span>
+            ) : (
+              <Image
+                src="/brand/logo-master-navy.png"
+                alt="Eckstein Podcast"
+                width={96}
+                height={96}
+                priority
+                className="w-full h-full object-cover"
+                onError={() => setLogoFailed(true)}
+              />
+            )}
           </div>
           <div className="text-center">
             <h1
