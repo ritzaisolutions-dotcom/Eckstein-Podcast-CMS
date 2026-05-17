@@ -22,6 +22,11 @@ const PLATFORMS_BY_TYPE: Record<string, { slug: string; label: string; color: st
     { slug: "x",        label: "X",        color: "#05101f", bg: "rgba(12,30,53,0.08)" },
     { slug: "website",  label: "Website",  color: "#05101f", bg: "rgba(12,30,53,0.06)" },
   ],
+  social_post: [
+    { slug: "instagram", label: "Instagram", color: "#c9a84c", bg: "rgba(201,168,76,0.1)" },
+    { slug: "x",         label: "X",         color: "#05101f", bg: "rgba(12,30,53,0.08)" },
+    { slug: "tiktok",    label: "TikTok",    color: "#05101f", bg: "rgba(12,30,53,0.08)" },
+  ],
 };
 
 const PLACEHOLDER_URL: Record<string, string> = {
@@ -38,9 +43,10 @@ const PLACEHOLDER_URL: Record<string, string> = {
 };
 
 const CONTENT_TYPE_OPTIONS = [
-  { value: "lfc",     label: "LFC — Long Form Content" },
-  { value: "sfc",     label: "SFC — Short Form Content" },
-  { value: "article", label: "Article — Das Fundament" },
+  { value: "lfc",         label: "LFC — Long Form Content" },
+  { value: "sfc",         label: "SFC — Short Form Content" },
+  { value: "article",     label: "Article — Das Fundament" },
+  { value: "social_post", label: "Beitrag — Social Post" },
 ];
 
 // Lifecycle stages — each stage can optionally carry a date
@@ -103,7 +109,7 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
     setPlatformLinks({});
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setSaving(true);
     await new Promise(r => setTimeout(r, 600));
