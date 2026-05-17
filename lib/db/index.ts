@@ -8,9 +8,9 @@ export function getDb() {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL is not set");
   if (!_client) {
-    // Session pooler (port 5432) — lower latency than transaction pooler (6543)
-    // prepare:false still needed; idle_timeout keeps connections warm between requests
-    _client = postgres(url, { ssl: "require", max: 10, prepare: false, idle_timeout: 30, connect_timeout: 10 });
+    // Transaction pooler (port 6543) — designed for serverless, multiplexes many requests over few connections
+    // max:1 per serverless instance; prepare:false required for PgBouncer
+    _client = postgres(url, { ssl: "require", max: 1, prepare: false, connect_timeout: 10 });
   }
   return drizzle(_client, { schema });
 }
