@@ -336,6 +336,16 @@ export default async function OheDashboard() {
           </Link>
         )}
       </div>
+
+      {/* Leitwort */}
+      <div className="mt-10 mb-2 text-center">
+        <p className="text-base" style={{ fontFamily: "var(--font-cormorant)", fontStyle: "italic", color: "var(--text-muted)", letterSpacing: "0.02em" }}>
+          »Denn aus ihm und durch ihn und auf ihn hin ist alles.«
+        </p>
+        <p className="text-xs mt-1 tracking-widest uppercase" style={{ fontFamily: "var(--font-cinzel)", color: "var(--gold)", fontSize: "0.55rem" }}>
+          Römer 11,36
+        </p>
+      </div>
     </div>
   );
 }

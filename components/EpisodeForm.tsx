@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Button from "./ui/Button";
 
 // ─── Platform definitions per content type ────────────────────────────────────
@@ -49,7 +50,6 @@ const CONTENT_TYPE_OPTIONS = [
   { value: "social_post", label: "Beitrag — Social Post" },
 ];
 
-// Lifecycle stages — each stage can optionally carry a date
 const LIFECYCLE_OPTIONS: { value: string; label: string; dateLabel?: string }[] = [
   { value: "draft",     label: "Draft" },
   { value: "scripting", label: "Scripting" },
@@ -70,18 +70,61 @@ interface EpisodeFormProps {
   episodeId?: string;
 }
 
+function toDatetimeLocal(iso?: string | null): string {
+  if (!iso) return "";
+  return new Date(iso).toISOString().slice(0, 16);
+}
+
 export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
+  const router = useRouter();
+
   const [contentType, setContentType] = useState("lfc");
   const [lifecycleStage, setLifecycleStage] = useState("draft");
   const [stageDates, setStageDates] = useState<Record<string, string>>({});
   const [selectedPlatforms, setSelectedPlatforms] = useState<Set<string>>(new Set());
   const [platformLinks, setPlatformLinks] = useState<Record<string, PlatformLink>>({});
+  const [title, setTitle] = useState("");
+  const [episodeNumber, setEpisodeNumber] = useState("");
+  const [bio, setBio] = useState("");
+  const [bodyMd, setBodyMd] = useState("");
   const [uploadDate, setUploadDate] = useState("");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(!!episodeId);
 
   const currentStageConfig = LIFECYCLE_OPTIONS.find(o => o.value === lifecycleStage);
-
   const availablePlatforms = PLATFORMS_BY_TYPE[contentType] ?? [];
+
+  // Load existing content when editing
+  useEffect(() => {
+    if (!episodeId) return;
+    fetch(`/api/content/${episodeId}`)
+      .then(r => r.json())
+      .then(data => {
+        setContentType(data.type ?? "lfc");
+        setLifecycleStage(data.lifecycleStage ?? "draft");
+        setTitle(data.title ?? "");
+        setEpisodeNumber(data.episodeNumber ? String(data.episodeNumber) : "");
+        setBio(data.bio ?? "");
+        setBodyMd(data.bodyMd ?? "");
+        setUploadDate(toDatetimeLocal(data.uploadDate));
+
+        const dates: Record<string, string> = {};
+        if (data.filmingDate) dates["filming"] = toDatetimeLocal(data.filmingDate);
+        if (data.uploadDate && data.lifecycleStage === "live") dates["live"] = toDatetimeLocal(data.uploadDate);
+        setStageDates(dates);
+
+        if (data.platformLinks?.length > 0) {
+          const slugs = new Set<string>(data.platformLinks.map((l: PlatformLink) => l.slug));
+          setSelectedPlatforms(slugs);
+          const linksMap: Record<string, PlatformLink> = {};
+          for (const l of data.platformLinks) linksMap[l.slug] = l;
+          setPlatformLinks(linksMap);
+        }
+      })
+      .catch(() => setError("Fehler beim Laden"))
+      .finally(() => setLoading(false));
+  }, [episodeId]);
 
   function togglePlatform(slug: string) {
     setSelectedPlatforms(prev => {
@@ -102,7 +145,6 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
     setPlatformLinks(pl => ({ ...pl, [slug]: { ...pl[slug], [field]: value } }));
   }
 
-  // When content type changes, clear platform selections
   function handleTypeChange(t: string) {
     setContentType(t);
     setSelectedPlatforms(new Set());
@@ -111,13 +153,60 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setError("");
     setSaving(true);
-    await new Promise(r => setTimeout(r, 600));
-    setSaving(false);
+
+    const links = Array.from(selectedPlatforms).map(slug => platformLinks[slug] ?? { slug, url: "", externalId: "", scheduledAt: "" });
+
+    const payload = {
+      type: contentType,
+      title,
+      bio: bio || null,
+      bodyMd: bodyMd || null,
+      episodeNumber: episodeNumber || null,
+      lifecycleStage,
+      uploadDate: uploadDate || stageDates["live"] || null,
+      filmingDate: stageDates["filming"] || null,
+      platformLinks: links,
+    };
+
+    try {
+      const url = episodeId ? `/api/content/${episodeId}` : "/api/content";
+      const method = episodeId ? "PATCH" : "POST";
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        setError(err.error ?? "Fehler beim Speichern");
+        return;
+      }
+
+      const data = await res.json();
+      router.push(`/content/${episodeId ?? data.id}`);
+      router.refresh();
+    } catch {
+      setError("Netzwerkfehler — bitte erneut versuchen");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) {
+    return <div className="cms-card py-8 text-center text-sm" style={{ color: "var(--text-muted)", fontStyle: "italic" }}>Lade...</div>;
   }
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+
+      {error && (
+        <div className="px-4 py-3 rounded border text-sm" style={{ borderColor: "#c0392b", background: "rgba(192,57,43,0.06)", color: "#c0392b", fontFamily: "var(--font-eb-garamond)" }}>
+          {error}
+        </div>
+      )}
 
       {/* Content Type + Lifecycle */}
       <div className="cms-card flex flex-col gap-4">
@@ -180,23 +269,52 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
         {(contentType === "lfc" || contentType === "sfc") && (
           <div>
             <label className="cms-label">Episode #</label>
-            <input type="number" name="episodeNumber" min={1} className="cms-input" placeholder="13" style={{ maxWidth: 120 }} />
+            <input
+              type="number"
+              min={1}
+              className="cms-input"
+              placeholder="13"
+              value={episodeNumber}
+              onChange={e => setEpisodeNumber(e.target.value)}
+              style={{ maxWidth: 120 }}
+            />
           </div>
         )}
 
         <div>
-          <label className="cms-label">Titel</label>
-          <input type="text" name="title" required className="cms-input" placeholder="Titel..." />
+          <label className="cms-label">Titel *</label>
+          <input
+            type="text"
+            required
+            className="cms-input"
+            placeholder="Titel..."
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+          />
         </div>
 
         <div>
           <label className="cms-label">Kurzbeschreibung</label>
-          <textarea name="bio" rows={2} className="cms-input" style={{ resize: "vertical" }} placeholder="Kurze Beschreibung für Listings..." />
+          <textarea
+            rows={2}
+            className="cms-input"
+            style={{ resize: "vertical" }}
+            placeholder="Kurze Beschreibung für Listings..."
+            value={bio}
+            onChange={e => setBio(e.target.value)}
+          />
         </div>
 
         <div>
           <label className="cms-label">Show Notes / Body (Markdown)</label>
-          <textarea name="bodyMd" rows={6} className="cms-input" style={{ resize: "vertical", fontFamily: "monospace", fontSize: "0.85rem" }} placeholder="# Show Notes&#10;&#10;..." />
+          <textarea
+            rows={6}
+            className="cms-input"
+            style={{ resize: "vertical", fontFamily: "monospace", fontSize: "0.85rem" }}
+            placeholder={"# Show Notes\n\n..."}
+            value={bodyMd}
+            onChange={e => setBodyMd(e.target.value)}
+          />
         </div>
       </div>
 
@@ -207,7 +325,6 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
           <label className="cms-label">Datum & Uhrzeit</label>
           <input
             type="datetime-local"
-            name="uploadDate"
             value={uploadDate}
             onChange={e => setUploadDate(e.target.value)}
             className="cms-input"
@@ -221,7 +338,7 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
         </div>
       </div>
 
-      {/* Platform Tags — click to add */}
+      {/* Platform Tags */}
       <div className="cms-card flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h2 className="cms-card-title">Plattformen</h2>
@@ -232,7 +349,6 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
           <p className="text-xs" style={{ color: "var(--text-muted)", fontStyle: "italic" }}>Keine Plattformen für diesen Content-Typ.</p>
         ) : (
           <>
-            {/* Tag pills */}
             <div className="flex flex-wrap gap-2">
               {availablePlatforms.map(p => {
                 const active = selectedPlatforms.has(p.slug);
@@ -258,7 +374,6 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
               })}
             </div>
 
-            {/* Inline link fields for selected platforms */}
             {selectedPlatforms.size > 0 && (
               <div className="flex flex-col gap-4 pt-1 border-t" style={{ borderColor: "var(--border)" }}>
                 {availablePlatforms
@@ -321,7 +436,9 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
 
       {/* Submit */}
       <div className="flex gap-3 justify-end">
-        <Button type="button" variant="ghost" size="sm">Verwerfen</Button>
+        <Button type="button" variant="ghost" size="sm" onClick={() => router.back()}>
+          Verwerfen
+        </Button>
         <Button type="submit" disabled={saving} size="sm">
           {saving ? "Speichern..." : episodeId ? "Aktualisieren" : "Content erstellen"}
         </Button>
