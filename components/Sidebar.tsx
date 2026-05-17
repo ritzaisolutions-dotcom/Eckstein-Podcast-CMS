@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 
 interface NavItem {
@@ -82,14 +81,15 @@ export default function Sidebar() {
         {/* Logo */}
         <div className="px-4 py-4 border-b" style={{ borderColor: "var(--border)" }}>
           <Link href="/" className="flex items-center gap-2.5">
-            <Image
-              src="/brand/logo.png"
-              alt="Eckstein Podcast"
-              width={32}
-              height={32}
-              className="shrink-0 rounded-sm"
-              style={{ objectFit: "contain" }}
-            />
+            {/* Geometric E•S monogram: diamond outline + inner solid + E letterform */}
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
+              <polygon points="16,2 30,16 16,30 2,16" stroke="#c9a84c" strokeWidth="1.5" fill="none"/>
+              <polygon points="16,7 25,16 16,25 7,16" fill="#05101f"/>
+              <line x1="12" y1="12" x2="12" y2="20" stroke="#c9a84c" strokeWidth="1.5" strokeLinecap="round"/>
+              <line x1="12" y1="12" x2="19" y2="12" stroke="#c9a84c" strokeWidth="1.5" strokeLinecap="round"/>
+              <line x1="12" y1="16" x2="18" y2="16" stroke="#c9a84c" strokeWidth="1.25" strokeLinecap="round"/>
+              <line x1="12" y1="20" x2="19" y2="20" stroke="#c9a84c" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
             <div>
               <div
                 className="text-sm tracking-[0.12em] uppercase leading-none"
