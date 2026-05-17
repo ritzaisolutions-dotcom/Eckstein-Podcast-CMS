@@ -8,7 +8,8 @@ export function getDb() {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL is not set");
   if (!_client) {
-    _client = postgres(url, { ssl: "require", max: 1 });
+    // prepare: false required for Supabase Transaction pooler (PgBouncer)
+    _client = postgres(url, { ssl: "require", max: 1, prepare: false });
   }
   return drizzle(_client, { schema });
 }
