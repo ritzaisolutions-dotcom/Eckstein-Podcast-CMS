@@ -174,14 +174,12 @@ export default async function OheDashboard() {
         </p>
       </div>
 
-      {/* Content Counts — motivierende Zahlen */}
-      <div className="grid grid-cols-3 md:grid-cols-6 gap-2 mb-6">
+      {/* Content Counts */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-6">
         <StatCard label="Gesamt" value={totalCount} accent />
-        <StatCard label="Episoden" value={countByType["lfc"] ?? 0} />
-        <StatCard label="Shorts" value={countByType["sfc"] ?? 0} />
+        <StatCard label="Episoden (LFC)" value={countByType["lfc"] ?? 0} />
+        <StatCard label="Shorts (SFC)" value={countByType["sfc"] ?? 0} />
         <StatCard label="Artikel" value={countByType["article"] ?? 0} />
-        <StatCard label="Newsletter" value={countByType["newsletter"] ?? 0} />
-        <StatCard label="Social" value={countByType["social_post"] ?? 0} />
       </div>
 
       {/* KPI Block */}
