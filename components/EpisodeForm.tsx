@@ -50,13 +50,13 @@ const CONTENT_TYPE_OPTIONS = [
   { value: "social_post", label: "Beitrag — Social Post" },
 ];
 
-const LIFECYCLE_OPTIONS: { value: string; label: string; dateLabel?: string }[] = [
+const LIFECYCLE_OPTIONS = [
   { value: "draft",     label: "Draft" },
   { value: "scripting", label: "Scripting" },
-  { value: "filming",   label: "Filming",  dateLabel: "Drehdatum" },
+  { value: "filming",   label: "Filming" },
   { value: "editing",   label: "Editing" },
   { value: "revision",  label: "Revision" },
-  { value: "live",      label: "Live",     dateLabel: "Geplantes Datum" },
+  { value: "live",      label: "Live" },
 ];
 
 interface PlatformLink {
@@ -80,7 +80,6 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
 
   const [contentType, setContentType] = useState("lfc");
   const [lifecycleStage, setLifecycleStage] = useState("draft");
-  const [stageDates, setStageDates] = useState<Record<string, string>>({});
   const [selectedPlatforms, setSelectedPlatforms] = useState<Set<string>>(new Set());
   const [platformLinks, setPlatformLinks] = useState<Record<string, PlatformLink>>({});
   const [title, setTitle] = useState("");
@@ -92,7 +91,6 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(!!episodeId);
 
-  const currentStageConfig = LIFECYCLE_OPTIONS.find(o => o.value === lifecycleStage);
   const availablePlatforms = PLATFORMS_BY_TYPE[contentType] ?? [];
 
   // Load existing content when editing
@@ -109,10 +107,6 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
         setBodyMd(data.bodyMd ?? "");
         setUploadDate(toDatetimeLocal(data.uploadDate));
 
-        const dates: Record<string, string> = {};
-        if (data.filmingDate) dates["filming"] = toDatetimeLocal(data.filmingDate);
-        if (data.uploadDate && data.lifecycleStage === "live") dates["live"] = toDatetimeLocal(data.uploadDate);
-        setStageDates(dates);
 
         if (data.platformLinks?.length > 0) {
           const slugs = new Set<string>(data.platformLinks.map((l: PlatformLink) => l.slug));
@@ -165,8 +159,8 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
       bodyMd: bodyMd || null,
       episodeNumber: episodeNumber || null,
       lifecycleStage,
-      uploadDate: uploadDate || stageDates["live"] || null,
-      filmingDate: stageDates["filming"] || null,
+      uploadDate: uploadDate || null,
+      filmingDate: null,
       platformLinks: links,
     };
 
@@ -240,24 +234,6 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
                 </button>
               ))}
             </div>
-            {currentStageConfig?.dateLabel && (
-              <div className="mt-2">
-                <label className="cms-label">{currentStageConfig.dateLabel}</label>
-                <input
-                  type="datetime-local"
-                  step="60"
-                  className="cms-input"
-                  value={stageDates[lifecycleStage] ?? ""}
-                  onChange={e => setStageDates(prev => ({ ...prev, [lifecycleStage]: e.target.value }))}
-                  style={{ maxWidth: 260 }}
-                />
-                {stageDates[lifecycleStage] && (
-                  <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-                    {new Date(stageDates[lifecycleStage]).toLocaleString("de-DE", { weekday: "long", day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                  </p>
-                )}
-              </div>
-            )}
           </div>
         </div>
       </div>
