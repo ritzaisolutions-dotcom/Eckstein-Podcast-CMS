@@ -26,8 +26,8 @@ const ebGaramond = EB_Garamond({
 });
 
 export const metadata: Metadata = {
-  title: "Eckstein CMS",
-  description: "Content Management System — Eckstein Podcast",
+  title: "Eckstein Podcast CMS",
+  description: "Content Management System for the Eckstein Podcast",
 };
 
 export default function RootLayout({
