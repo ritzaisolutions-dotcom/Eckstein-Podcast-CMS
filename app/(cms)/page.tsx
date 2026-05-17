@@ -1,10 +1,9 @@
 export const dynamic = "force-dynamic";
-import StatCard from "@/components/ui/StatCard";
 import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { getCachedPlatforms, getCachedContentCounts } from "@/lib/cache";
-import { contentPieces, contentPlatformLinks, episodeTasks, clipQueue, forumThreads, analyticsSnapshots } from "@/lib/db/schema";
-import { eq, and, lte, isNull, isNotNull, count, desc, gte, inArray, or } from "drizzle-orm";
+import { contentPieces, contentPlatformLinks, episodeTasks, forumThreads, analyticsSnapshots } from "@/lib/db/schema";
+import { eq, and, lte, isNull, isNotNull, count, desc, gte, inArray, or, sql } from "drizzle-orm";
 
 const WOCHENTAGE = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 const MONATE = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
@@ -13,14 +12,26 @@ function formatDate(d: Date) {
   return `${WOCHENTAGE[d.getDay()]}, ${d.getDate()}. ${MONATE[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-function ampel(doneRatio: number, hasOverdue: boolean): { color: string; label: string; icon: string } {
-  if (hasOverdue) return { color: "#c0392b", label: "überfällig", icon: "●" };
-  if (doneRatio >= 0.8) return { color: "#4caf7d", label: "on track", icon: "●" };
-  if (doneRatio >= 0.4) return { color: "var(--gold)", label: "in Arbeit", icon: "●" };
-  return { color: "#c0392b", label: "Aufmerksamkeit", icon: "●" };
+const LIFECYCLE_PIPELINE = ["draft", "scripting", "filming", "editing", "revision", "live"];
+const PIPELINE_LABELS: Record<string, string> = {
+  draft: "Draft", scripting: "Scripting", filming: "Filming",
+  editing: "Editing", revision: "Revision", live: "Live",
+};
+
+function ampelColor(stage: string): string {
+  if (stage === "live") return "#4caf7d";
+  if (stage === "editing" || stage === "revision") return "var(--gold)";
+  if (stage === "filming") return "var(--gold)";
+  return "rgba(12,30,53,0.25)";
 }
 
-export default async function OheDashboard() {
+function fmt(n: number) {
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + "M";
+  if (n >= 1000) return (n / 1000).toFixed(1) + "k";
+  return String(n);
+}
+
+export default async function Dashboard() {
   const db = getDb();
   const today = new Date();
   const todayStr = today.toISOString().split("T")[0];
@@ -28,26 +39,23 @@ export default async function OheDashboard() {
   weekLater.setDate(today.getDate() + 7);
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-  // Cached counts (60s) + platforms (1h) run alongside live queries
   const [
     { total: totalCount, byType: countByType },
-    dueTodayLinks,
     platformRows,
+    dueTodayLinks,
     dueWeekLinks,
-    nextEp,
     recentEps,
-    openClipsCount,
     newIdeas,
     latestPublished,
+    recentIdeas,
   ] = await Promise.all([
-    // Content counts — cached 60s
     getCachedContentCounts(),
+    getCachedPlatforms(),
 
     // Heute fällig
     db.select({
         contentId: contentPlatformLinks.contentId,
         platformId: contentPlatformLinks.platformId,
-        scheduledAt: contentPlatformLinks.scheduledAt,
         title: contentPieces.title,
         episodeNumber: contentPieces.episodeNumber,
         type: contentPieces.type,
@@ -59,12 +67,9 @@ export default async function OheDashboard() {
         isNotNull(contentPlatformLinks.scheduledAt),
         lte(contentPlatformLinks.scheduledAt, new Date(todayStr + "T23:59:59Z")),
       ))
-      .limit(8),
+      .limit(6),
 
-    // Platform labels (cached 1h)
-    getCachedPlatforms(),
-
-    // Diese Woche — geplante Posts + Drehs
+    // Diese Woche
     db.select({
         id: contentPieces.id,
         title: contentPieces.title,
@@ -89,45 +94,38 @@ export default async function OheDashboard() {
           lte(contentPieces.filmingDate, weekLater),
         ),
       ))
-      .limit(8),
+      .limit(6),
 
-    // Nächste Episode
-    db.select()
-      .from(contentPieces)
-      .where(and(eq(contentPieces.type, "lfc"), eq(contentPieces.status, "scheduled")))
-      .orderBy(contentPieces.uploadDate)
-      .limit(1),
-
-    // Recent LFCs for Ampel
+    // Recent LFCs for pipeline view
     db.select()
       .from(contentPieces)
       .where(eq(contentPieces.type, "lfc"))
       .orderBy(desc(contentPieces.createdAt))
-      .limit(4),
+      .limit(5),
 
-    // Open clips count
-    db.select({ cnt: count() })
-      .from(clipQueue)
-      .where(inArray(clipQueue.status, ["timestamp_marked", "caption_ready"])),
-
-    // Neue Ideen
+    // Neue Ideen count
     db.select({ cnt: count() })
       .from(forumThreads)
       .where(gte(forumThreads.createdAt, weekAgo)),
 
-    // Latest published episode for KPI
+    // Latest published for KPI
     db.select()
       .from(contentPieces)
       .where(and(eq(contentPieces.type, "lfc"), eq(contentPieces.status, "published")))
       .orderBy(desc(contentPieces.uploadDate))
       .limit(1),
+
+    // Recent ideas for display
+    db.select({ id: forumThreads.id, title: forumThreads.title })
+      .from(forumThreads)
+      .orderBy(desc(forumThreads.createdAt))
+      .limit(4),
   ]);
 
   const platformMap = Object.fromEntries(platformRows.map(p => [p.id, p.slug]));
-  const openClips = Number(openClipsCount[0]?.cnt ?? 0);
   const newIdeasCount = Number(newIdeas[0]?.cnt ?? 0);
 
-  // Episode Ampel — single query for all episodes (no N+1)
+  // Episode tasks for ampel
   const recentEpIds = recentEps.map(e => e.id);
   const allTasks = recentEpIds.length > 0
     ? await db.select().from(episodeTasks).where(inArray(episodeTasks.contentId, recentEpIds))
@@ -137,93 +135,125 @@ export default async function OheDashboard() {
     if (!tasksByEp[t.contentId]) tasksByEp[t.contentId] = [];
     tasksByEp[t.contentId].push(t);
   }
-  const epAmpeln = recentEps
-    .map(ep => {
-      const tasks = tasksByEp[ep.id] ?? [];
-      if (tasks.length === 0) return null;
-      return { id: ep.id, title: ep.title, number: ep.episodeNumber, done: tasks.filter(t => t.done).length, total: tasks.length };
-    })
-    .filter(Boolean) as { id: string; title: string; number: number | null; done: number; total: number }[];
 
-  // KPI block — snapshot query only if we have an episode
-  let kpiBlock: { title: string; number: number | null; views: number; prevViews: number } | null = null;
+  // KPI
+  let kpiViews = 0;
+  let kpiPrevViews = 0;
+  let kpiNumber: number | null = null;
   if (latestPublished.length > 0) {
     const ep = latestPublished[0];
-    const snapshots = await db
-      .select({ views: analyticsSnapshots.views, capturedAt: analyticsSnapshots.capturedAt })
+    kpiNumber = ep.episodeNumber;
+    const snaps = await db
+      .select({ views: analyticsSnapshots.views })
       .from(analyticsSnapshots)
       .where(eq(analyticsSnapshots.contentId, ep.id))
       .orderBy(desc(analyticsSnapshots.capturedAt))
       .limit(2);
-    kpiBlock = { title: ep.title, number: ep.episodeNumber, views: snapshots[0]?.views ?? 0, prevViews: snapshots[1]?.views ?? 0 };
+    kpiViews = snaps[0]?.views ?? 0;
+    kpiPrevViews = snaps[1]?.views ?? 0;
   }
 
-  // --- Format helpers ---
-  function fmtViews(n: number) {
-    if (n >= 1000) return (n / 1000).toFixed(1) + "k";
-    return String(n);
-  }
+  // Platform performance aggregate
+  const platViews = await db
+    .select({
+      platformId: analyticsSnapshots.platformId,
+      views: sql<number>`SUM(${analyticsSnapshots.views})`.as("views"),
+    })
+    .from(analyticsSnapshots)
+    .groupBy(analyticsSnapshots.platformId)
+    .orderBy(desc(sql`SUM(${analyticsSnapshots.views})`))
+    .limit(4);
 
   return (
     <div className="px-4 md:px-8 py-6 max-w-5xl mx-auto">
+
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl tracking-tight" style={{ fontFamily: "var(--font-cinzel)", color: "var(--navy)" }}>Dashboard</h1>
-        <p className="text-sm mt-0.5" style={{ fontFamily: "var(--font-eb-garamond)", color: "var(--text-muted)", fontStyle: "italic" }}>
-          {formatDate(today)}
-        </p>
-      </div>
-
-      {/* Content Counts */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-6">
-        <StatCard label="Gesamt" value={totalCount} accent />
-        <StatCard label="Episoden (LFC)" value={countByType["lfc"] ?? 0} />
-        <StatCard label="Shorts (SFC)" value={countByType["sfc"] ?? 0} />
-        <StatCard label="Artikel" value={countByType["article"] ?? 0} />
-      </div>
-
-      {/* KPI Block */}
-      {kpiBlock && (
-        <div
-          className="mb-5 px-5 py-3 rounded border-l-4 flex items-center justify-between"
-          style={{ background: "var(--bg-surface)", borderLeftColor: "var(--gold)", borderTop: "1px solid var(--border)", borderRight: "1px solid var(--border)", borderBottom: "1px solid var(--border)" }}
-        >
-          <div>
-            <span className="text-xs uppercase tracking-widest" style={{ fontFamily: "var(--font-cinzel)", color: "var(--text-muted)" }}>
-              Top KPI
-            </span>
-            <p className="text-sm mt-0.5" style={{ color: "var(--text-primary)", fontFamily: "var(--font-eb-garamond)" }}>
-              {kpiBlock.number ? `EP.${kpiBlock.number}` : ""} · {kpiBlock.title}
-            </p>
-          </div>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl tracking-tight" style={{ fontFamily: "var(--font-cinzel)", color: "var(--navy)" }}>Dashboard</h1>
+          <p className="text-sm mt-0.5" style={{ fontFamily: "var(--font-eb-garamond)", color: "var(--text-muted)", fontStyle: "italic" }}>
+            {formatDate(today)}
+          </p>
+        </div>
+        {kpiViews > 0 && (
           <div className="text-right">
-            <span className="text-xl font-semibold" style={{ fontFamily: "var(--font-cinzel)", color: "var(--navy)" }}>
-              {fmtViews(kpiBlock.views)}
+            <span className="text-xs uppercase tracking-widest" style={{ fontFamily: "var(--font-cinzel)", color: "var(--text-muted)", fontSize: "0.55rem" }}>
+              {kpiNumber ? `EP.${kpiNumber}` : "Letzte Episode"} · Views
             </span>
-            <span className="text-xs ml-1" style={{ color: "var(--text-muted)" }}>Views</span>
-            {kpiBlock.prevViews > 0 && (
-              <p className="text-xs mt-0.5" style={{ color: kpiBlock.views >= kpiBlock.prevViews ? "#4caf7d" : "#c0392b" }}>
-                {kpiBlock.views >= kpiBlock.prevViews ? "↑" : "↓"} vs. letzter Snapshot
-              </p>
-            )}
+            <div className="flex items-baseline gap-1.5 justify-end">
+              <span className="text-2xl" style={{ fontFamily: "var(--font-cinzel)", color: "var(--navy)" }}>{fmt(kpiViews)}</span>
+              {kpiPrevViews > 0 && (
+                <span className="text-xs" style={{ color: kpiViews >= kpiPrevViews ? "#4caf7d" : "#c0392b" }}>
+                  {kpiViews >= kpiPrevViews ? "↑" : "↓"}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Gesamt-Zahl — grosse Zeile */}
+      <div className="cms-card mb-3 py-4 px-5 flex items-center justify-between">
+        <div>
+          <span className="text-xs uppercase tracking-widest" style={{ fontFamily: "var(--font-cinzel)", color: "var(--text-muted)", fontSize: "0.55rem" }}>
+            Content Pieces gesamt
+          </span>
+          <div className="text-4xl mt-0.5" style={{ fontFamily: "var(--font-cinzel)", color: "var(--navy)", lineHeight: 1 }}>
+            {totalCount}
           </div>
         </div>
-      )}
+        <Link href="/content" className="text-xs px-3 py-1.5 rounded border transition-colors shrink-0" style={{ borderColor: "var(--border)", color: "var(--text-muted)", fontFamily: "var(--font-cinzel)" }}>
+          Alle ansehen →
+        </Link>
+      </div>
 
-      {/* Main Grid */}
-      <div className="grid md:grid-cols-2 gap-4">
+      {/* 4 Type-Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-5">
+        {[
+          { type: "lfc",         label: "Episoden",  sub: "Long Form Content" },
+          { type: "sfc",         label: "Shorts",    sub: "Short Form Content" },
+          { type: "article",     label: "Artikel",   sub: "Das Fundament" },
+          { type: "social_post", label: "Beiträge",  sub: "Social Posts" },
+        ].map(({ type, label, sub }) => (
+          <Link key={type} href={`/content?type=${type}`} className="cms-card hover:border-gold transition-colors text-center py-4">
+            <div className="text-2xl" style={{ fontFamily: "var(--font-cinzel)", color: "var(--navy)" }}>
+              {countByType[type] ?? 0}
+            </div>
+            <div className="text-xs mt-0.5 uppercase tracking-widest" style={{ fontFamily: "var(--font-cinzel)", color: "var(--text-muted)", fontSize: "0.6rem" }}>
+              {label}
+            </div>
+            <div className="text-xs mt-0.5" style={{ fontFamily: "var(--font-eb-garamond)", color: "var(--text-muted)", fontStyle: "italic", fontSize: "0.75rem" }}>
+              {sub}
+            </div>
+          </Link>
+        ))}
+      </div>
+
+      {/* Main 2-col grid */}
+      <div className="grid md:grid-cols-2 gap-4 mb-4">
+
         {/* Heute fällig */}
         <section className="cms-card">
-          <h2 className="cms-card-title mb-3">Heute fällig</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="cms-card-title mb-0">Heute fällig</h2>
+            {dueTodayLinks.length > 0 && (
+              <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: "rgba(192,57,43,0.1)", color: "#c0392b", fontFamily: "var(--font-cinzel)", fontSize: "0.55rem" }}>
+                {dueTodayLinks.length}
+              </span>
+            )}
+          </div>
           {dueTodayLinks.length === 0 ? (
             <p className="text-sm" style={{ color: "var(--text-muted)", fontStyle: "italic" }}>Alles erledigt ✓</p>
           ) : (
-            <ul className="flex flex-col gap-2">
+            <ul className="flex flex-col gap-0">
               {dueTodayLinks.map((item, i) => (
-                <li key={i} className="flex items-center gap-3">
-                  <span className="w-4 h-4 rounded border shrink-0" style={{ borderColor: "var(--gold)" }} />
-                  <Link href={`/content?type=${item.type}`} className="text-sm hover:underline" style={{ color: "var(--text-primary)", fontFamily: "var(--font-eb-garamond)" }}>
-                    {item.episodeNumber ? `Ep.${item.episodeNumber}` : item.title} → {platformMap[item.platformId] ?? item.platformId}
+                <li key={i} className="flex items-center gap-3 py-2 border-b last:border-0" style={{ borderColor: "var(--border)" }}>
+                  <span className="w-3.5 h-3.5 rounded border shrink-0" style={{ borderColor: "var(--gold)" }} />
+                  <Link href={`/content?type=${item.type}`} className="text-sm hover:underline flex-1" style={{ color: "var(--text-primary)", fontFamily: "var(--font-eb-garamond)" }}>
+                    {item.episodeNumber ? `EP.${item.episodeNumber}` : item.title}
+                    <span className="ml-1.5 text-xs" style={{ color: "var(--text-muted)" }}>
+                      → {(platformMap[item.platformId] ?? "?").replace("_", " ").toUpperCase()}
+                    </span>
                   </Link>
                 </li>
               ))}
@@ -231,26 +261,48 @@ export default async function OheDashboard() {
           )}
         </section>
 
-        {/* Episode Status — Ampel */}
+        {/* Episode Pipeline */}
         <section className="cms-card">
-          <h2 className="cms-card-title mb-3">Episode Status</h2>
-          {epAmpeln.length === 0 ? (
-            <p className="text-sm" style={{ color: "var(--text-muted)", fontStyle: "italic" }}>
-              Keine Tasks angelegt — Tasks werden beim Planen einer Episode generiert.
-            </p>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="cms-card-title mb-0">Episode-Pipeline</h2>
+            <Link href="/content?type=lfc" className="text-xs" style={{ color: "var(--text-muted)", fontFamily: "var(--font-cinzel)", fontSize: "0.55rem" }}>
+              Alle →
+            </Link>
+          </div>
+          {recentEps.length === 0 ? (
+            <p className="text-sm" style={{ color: "var(--text-muted)", fontStyle: "italic" }}>Noch keine Episoden</p>
           ) : (
-            <ul className="flex flex-col gap-2">
-              {epAmpeln.map(ep => {
-                const ratio = ep.done / ep.total;
-                const a = ampel(ratio, false);
+            <ul className="flex flex-col gap-0">
+              {recentEps.map(ep => {
+                const stageIdx = LIFECYCLE_PIPELINE.indexOf(ep.lifecycleStage ?? "draft");
                 return (
-                  <li key={ep.id} className="flex items-center gap-3">
-                    <span style={{ color: a.color, fontSize: "0.7rem" }}>{a.icon}</span>
-                    <Link href={`/content/${ep.id}`} className="text-sm hover:underline flex-1" style={{ color: "var(--text-primary)", fontFamily: "var(--font-eb-garamond)" }}>
-                      {ep.number ? `EP.${ep.number}` : ep.title}
+                  <li key={ep.id} className="flex items-center gap-2 py-2 border-b last:border-0" style={{ borderColor: "var(--border)" }}>
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: ampelColor(ep.lifecycleStage ?? "draft") }} />
+                    <Link href={`/episodes/${ep.id}`} className="text-xs shrink-0 hover:underline" style={{ color: "var(--text-muted)", fontFamily: "var(--font-cinzel)", minWidth: 36 }}>
+                      {ep.episodeNumber ? `EP.${ep.episodeNumber}` : `#${ep.contentId}`}
                     </Link>
-                    <span className="text-xs" style={{ color: "var(--text-muted)" }}>{ep.done}/{ep.total}</span>
-                    <span className="text-xs" style={{ color: a.color }}>{a.label}</span>
+                    <Link href={`/episodes/${ep.id}`} className="text-sm hover:underline flex-1 truncate" style={{ color: "var(--text-primary)", fontFamily: "var(--font-eb-garamond)" }}>
+                      {ep.title}
+                    </Link>
+                    <div className="flex gap-0.5 shrink-0">
+                      {LIFECYCLE_PIPELINE.map((s, i) => (
+                        <span
+                          key={s}
+                          className="text-xs px-1.5 py-0.5 rounded"
+                          style={{
+                            fontFamily: "var(--font-cinzel)",
+                            fontSize: "0.48rem",
+                            letterSpacing: "0.04em",
+                            background: i < stageIdx ? "var(--cream-mid)" : i === stageIdx ? "rgba(201,168,76,0.2)" : "transparent",
+                            color: i < stageIdx ? "var(--text-muted)" : i === stageIdx ? "var(--gold)" : "var(--border)",
+                            textDecoration: i < stageIdx ? "line-through" : "none",
+                            border: i === stageIdx ? "1px solid rgba(201,168,76,0.4)" : "1px solid transparent",
+                          }}
+                        >
+                          {PIPELINE_LABELS[s]}
+                        </span>
+                      ))}
+                    </div>
                   </li>
                 );
               })}
@@ -262,25 +314,25 @@ export default async function OheDashboard() {
         <section className="cms-card">
           <h2 className="cms-card-title mb-3">Diese Woche</h2>
           {dueWeekLinks.length === 0 ? (
-            <p className="text-sm" style={{ color: "var(--text-muted)", fontStyle: "italic" }}>Nichts geplant diese Woche</p>
+            <p className="text-sm" style={{ color: "var(--text-muted)", fontStyle: "italic" }}>Nichts geplant</p>
           ) : (
-            <ul className="flex flex-col gap-2">
+            <ul className="flex flex-col gap-0">
               {dueWeekLinks.map((item, i) => {
                 const isFilming = item.lifecycleStage === "filming" && item.filmingDate;
                 const date = isFilming ? item.filmingDate : item.scheduledAt;
                 return (
-                  <li key={i} className="flex items-center gap-2">
+                  <li key={i} className="flex items-center gap-2 py-2 border-b last:border-0" style={{ borderColor: "var(--border)" }}>
                     {isFilming && (
-                      <span className="text-xs px-1.5 py-0.5 rounded shrink-0" style={{ background: "rgba(201,168,76,0.15)", color: "var(--gold)", fontFamily: "var(--font-cinzel)", fontSize: "0.52rem", letterSpacing: "0.07em" }}>
+                      <span className="text-xs px-1.5 py-0.5 rounded shrink-0" style={{ background: "rgba(201,168,76,0.15)", color: "var(--gold)", fontFamily: "var(--font-cinzel)", fontSize: "0.5rem" }}>
                         DREH
                       </span>
                     )}
                     <Link href={`/content/${item.id}`} className="text-sm hover:underline flex-1" style={{ color: "var(--text-secondary)", fontFamily: "var(--font-eb-garamond)" }}>
-                      {item.episodeNumber ? `Ep.${item.episodeNumber}` : item.title}
+                      {item.episodeNumber ? `EP.${item.episodeNumber}` : item.title}
                     </Link>
                     {date && (
                       <span className="text-xs shrink-0" style={{ color: "var(--text-muted)" }}>
-                        {new Date(date).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}
+                        {new Date(date).toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" })}
                       </span>
                     )}
                   </li>
@@ -290,59 +342,67 @@ export default async function OheDashboard() {
           )}
         </section>
 
-        {/* Nächste Episode */}
-        <section className="cms-card" style={{ borderTopColor: "var(--gold)", borderTopWidth: 2 }}>
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="cms-card-title">Nächste Episode</h2>
-              {nextEp.length > 0 ? (
-                <>
-                  <p className="text-sm mt-1" style={{ color: "var(--text-secondary)", fontStyle: "italic", fontFamily: "var(--font-cormorant)" }}>
-                    {nextEp[0].episodeNumber ? `#${nextEp[0].episodeNumber} · ` : ""}{nextEp[0].title}
-                  </p>
-                  {nextEp[0].uploadDate && (
-                    <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-                      📅 {new Date(nextEp[0].uploadDate).toLocaleDateString("de-DE", { weekday: "long", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
-                    </p>
-                  )}
-                </>
-              ) : (
-                <p className="text-sm mt-1" style={{ color: "var(--text-muted)", fontStyle: "italic" }}>Keine Episode geplant</p>
-              )}
-            </div>
-            <Link href="/prep" className="shrink-0 text-xs px-3 py-1.5 rounded border transition-colors" style={{ borderColor: "var(--gold)", color: "var(--gold)", fontFamily: "var(--font-cinzel)" }}>
-              Zum Prep →
+        {/* Ideen & Topics */}
+        <section className="cms-card">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="cms-card-title mb-0">Ideen & Topics</h2>
+            <Link href="/mind-dump" className="text-xs" style={{ color: "var(--text-muted)", fontFamily: "var(--font-cinzel)", fontSize: "0.55rem" }}>
+              Alle →
             </Link>
           </div>
+          {recentIdeas.length === 0 ? (
+            <p className="text-sm" style={{ color: "var(--text-muted)", fontStyle: "italic" }}>Noch keine Ideen</p>
+          ) : (
+            <ul className="flex flex-col gap-0">
+              {recentIdeas.map(idea => (
+                <li key={idea.id} className="flex items-start gap-2 py-2 border-b last:border-0" style={{ borderColor: "var(--border)" }}>
+                  <span className="w-1.5 h-1.5 rounded-full shrink-0 mt-1.5" style={{ background: "var(--text-muted)" }} />
+                  <Link href={`/mind-dump/${idea.id}`} className="text-sm hover:underline" style={{ color: "var(--text-secondary)", fontFamily: "var(--font-eb-garamond)" }}>
+                    {idea.title}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+          {newIdeasCount > 0 && (
+            <p className="text-xs mt-2 pt-2 border-t" style={{ borderColor: "var(--border)", color: "var(--text-muted)", fontStyle: "italic" }}>
+              {newIdeasCount} neue diese Woche
+            </p>
+          )}
         </section>
       </div>
 
-      {/* Footer row: Clips + Ideen */}
-      <div className="mt-4 grid md:grid-cols-2 gap-3">
-        {openClips > 0 && (
-          <Link href="/content?type=sfc" className="flex items-center justify-between px-4 py-3 rounded border hover:border-gold transition-colors" style={{ borderColor: "var(--border)", background: "var(--bg-surface)" }}>
-            <span className="text-sm" style={{ color: "var(--text-secondary)", fontFamily: "var(--font-eb-garamond)" }}>
-              ⬡ {openClips} offene Clips
-            </span>
-            <span className="text-xs" style={{ color: "var(--gold)" }}>Ansehen →</span>
-          </Link>
-        )}
-        {newIdeasCount > 0 && (
-          <Link href="/mind-dump" className="flex items-center justify-between px-4 py-3 rounded border hover:border-gold transition-colors" style={{ borderColor: "var(--border)", background: "var(--bg-surface)" }}>
-            <span className="text-sm" style={{ color: "var(--text-secondary)", fontFamily: "var(--font-eb-garamond)" }}>
-              ⊕ {newIdeasCount} neue Ideen & Topics
-            </span>
-            <span className="text-xs" style={{ color: "var(--gold)" }}>Ansehen →</span>
-          </Link>
-        )}
-      </div>
+      {/* Plattform-Performance */}
+      {platViews.length > 0 && (
+        <section className="cms-card mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="cms-card-title mb-0">Plattform-Performance</h2>
+            <Link href="/analytics" className="text-xs" style={{ color: "var(--text-muted)", fontFamily: "var(--font-cinzel)", fontSize: "0.55rem" }}>
+              Analytics →
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {platViews.map(p => {
+              const slug = platformMap[p.platformId] ?? String(p.platformId);
+              return (
+                <div key={p.platformId} className="text-center py-2">
+                  <div className="text-lg" style={{ fontFamily: "var(--font-cinzel)", color: "var(--navy)" }}>{fmt(Number(p.views))}</div>
+                  <div className="text-xs uppercase tracking-widest mt-0.5" style={{ fontFamily: "var(--font-cinzel)", color: "var(--text-muted)", fontSize: "0.55rem" }}>
+                    {slug.replace("_", " ")}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* Leitwort */}
-      <div className="mt-10 mb-2 text-center">
-        <p className="text-base" style={{ fontFamily: "var(--font-cormorant)", fontStyle: "italic", color: "var(--text-muted)", letterSpacing: "0.02em" }}>
+      <div className="mt-8 mb-2 text-center py-6 border-t" style={{ borderColor: "var(--border)" }}>
+        <p className="text-xl md:text-2xl" style={{ fontFamily: "var(--font-cormorant)", fontStyle: "italic", color: "var(--navy-3)", letterSpacing: "0.02em", lineHeight: 1.4 }}>
           »Denn aus ihm und durch ihn und auf ihn hin ist alles.«
         </p>
-        <p className="text-xs mt-1 tracking-widest uppercase" style={{ fontFamily: "var(--font-cinzel)", color: "var(--gold)", fontSize: "0.55rem" }}>
+        <p className="text-xs mt-2 tracking-widest uppercase" style={{ fontFamily: "var(--font-cinzel)", color: "var(--gold)", fontSize: "0.6rem" }}>
           Römer 11,36
         </p>
       </div>
