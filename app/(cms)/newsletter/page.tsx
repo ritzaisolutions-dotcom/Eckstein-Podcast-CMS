@@ -58,7 +58,7 @@ export default async function NewsletterPage() {
           <p className="text-sm" style={{ color: "var(--text-muted)", fontStyle: "italic" }}>
             Noch keine Artikel angelegt. Das Fundament erscheint jeden Sonntag auf Substack und X.
           </p>
-          <Link href="/episodes/new" className="inline-block mt-4 text-xs px-4 py-2 rounded" style={{ background: "var(--navy)", color: "var(--cream)", fontFamily: "var(--font-cinzel)" }}>
+          <Link href="/episodes/new?type=article" className="inline-block mt-4 text-xs px-4 py-2 rounded" style={{ background: "var(--navy)", color: "var(--cream)", fontFamily: "var(--font-cinzel)" }}>
             Ersten Artikel anlegen
           </Link>
         </div>

@@ -327,7 +327,7 @@ export default async function Dashboard() {
                         DREH
                       </span>
                     )}
-                    <Link href={`/content/${item.id}`} className="text-sm hover:underline flex-1" style={{ color: "var(--text-secondary)", fontFamily: "var(--font-eb-garamond)" }}>
+                    <Link href={`/episodes/${item.id}`} className="text-sm hover:underline flex-1" style={{ color: "var(--text-secondary)", fontFamily: "var(--font-eb-garamond)" }}>
                       {item.episodeNumber ? `EP.${item.episodeNumber}` : item.title}
                     </Link>
                     {date && (
