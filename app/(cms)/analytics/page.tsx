@@ -1,7 +1,8 @@
 export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { getDb } from "@/lib/db";
-import { contentPieces, analyticsSnapshots, platforms, contentPlatformLinks } from "@/lib/db/schema";
+import { getCachedPlatforms } from "@/lib/cache";
+import { contentPieces, analyticsSnapshots, contentPlatformLinks } from "@/lib/db/schema";
 import { eq, desc, inArray, sql, and } from "drizzle-orm";
 
 const TYPE_PILLS = [
@@ -46,7 +47,7 @@ export default async function AnalyticsPage({
       .where(inArray(analyticsSnapshots.contentId, ids))
       .groupBy(analyticsSnapshots.contentId, analyticsSnapshots.platformId),
 
-    db.select().from(platforms),
+    getCachedPlatforms(),
 
     db.select().from(contentPlatformLinks).where(inArray(contentPlatformLinks.contentId, ids)),
   ]);

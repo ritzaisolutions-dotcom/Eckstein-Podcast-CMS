@@ -1,7 +1,8 @@
 export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { getDb } from "@/lib/db";
-import { contentPieces, contentPlatformLinks, analyticsSnapshots, platforms } from "@/lib/db/schema";
+import { getCachedPlatforms } from "@/lib/cache";
+import { contentPieces, contentPlatformLinks, analyticsSnapshots } from "@/lib/db/schema";
 import { eq, desc, ilike, and, inArray, sql } from "drizzle-orm";
 import Badge from "@/components/ui/Badge";
 import TypeSelect from "./TypeSelect";
@@ -45,7 +46,7 @@ export default async function ContentPage({
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(contentPieces.createdAt))
       .limit(100),
-    db.select().from(platforms),
+    getCachedPlatforms(),
   ]);
 
   const ids = pieces.map(p => p.id);

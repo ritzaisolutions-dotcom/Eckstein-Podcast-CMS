@@ -2,7 +2,8 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import Badge from "@/components/ui/Badge";
 import { getDb } from "@/lib/db";
-import { contentPieces, analyticsSnapshots, contentPlatformLinks, platforms } from "@/lib/db/schema";
+import { getCachedPlatforms } from "@/lib/cache";
+import { contentPieces, analyticsSnapshots, contentPlatformLinks } from "@/lib/db/schema";
 import { eq, desc, inArray, sql, and } from "drizzle-orm";
 
 const LIFECYCLE_STAGES = [
@@ -49,7 +50,7 @@ export default async function EpisodesPage({
   const links = ids.length > 0
     ? await db.select().from(contentPlatformLinks).where(inArray(contentPlatformLinks.contentId, ids))
     : [];
-  const platformRows = await db.select().from(platforms);
+  const platformRows = await getCachedPlatforms();
   const platMap = Object.fromEntries(platformRows.map(p => [p.id, p.slug]));
   const platByContent: Record<string, string[]> = {};
   for (const l of links) {

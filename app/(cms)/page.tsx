@@ -2,8 +2,9 @@ export const dynamic = "force-dynamic";
 import StatCard from "@/components/ui/StatCard";
 import Link from "next/link";
 import { getDb } from "@/lib/db";
-import { contentPieces, contentPlatformLinks, episodeTasks, clipQueue, forumThreads, analyticsSnapshots, platforms } from "@/lib/db/schema";
-import { eq, and, lte, isNull, isNotNull, count, desc, sql, gte, inArray } from "drizzle-orm";
+import { getCachedPlatforms, getCachedContentCounts } from "@/lib/cache";
+import { contentPieces, contentPlatformLinks, episodeTasks, clipQueue, forumThreads, analyticsSnapshots } from "@/lib/db/schema";
+import { eq, and, lte, isNull, isNotNull, count, desc, gte, inArray } from "drizzle-orm";
 
 const WOCHENTAGE = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 const MONATE = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
@@ -27,9 +28,9 @@ export default async function OheDashboard() {
   weekLater.setDate(today.getDate() + 7);
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-  // All independent queries run in parallel
+  // Cached counts (60s) + platforms (1h) run alongside live queries
   const [
-    typeCounts,
+    { total: totalCount, byType: countByType },
     dueTodayLinks,
     platformRows,
     dueWeekLinks,
@@ -39,10 +40,8 @@ export default async function OheDashboard() {
     newIdeas,
     latestPublished,
   ] = await Promise.all([
-    // Content counts per type
-    db.select({ type: contentPieces.type, cnt: count() })
-      .from(contentPieces)
-      .groupBy(contentPieces.type),
+    // Content counts — cached 60s
+    getCachedContentCounts(),
 
     // Heute fällig
     db.select({
@@ -62,8 +61,8 @@ export default async function OheDashboard() {
       ))
       .limit(8),
 
-    // Platform labels
-    db.select().from(platforms),
+    // Platform labels (cached 1h)
+    getCachedPlatforms(),
 
     // Diese Woche
     db.select({
@@ -114,8 +113,6 @@ export default async function OheDashboard() {
       .limit(1),
   ]);
 
-  const totalCount = typeCounts.reduce((s, r) => s + Number(r.cnt), 0);
-  const countByType = Object.fromEntries(typeCounts.map(r => [r.type, Number(r.cnt)]));
   const platformMap = Object.fromEntries(platformRows.map(p => [p.id, p.slug]));
   const openClips = Number(openClipsCount[0]?.cnt ?? 0);
   const newIdeasCount = Number(newIdeas[0]?.cnt ?? 0);

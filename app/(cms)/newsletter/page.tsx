@@ -2,7 +2,8 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import Badge from "@/components/ui/Badge";
 import { getDb } from "@/lib/db";
-import { contentPieces, contentPlatformLinks, platforms } from "@/lib/db/schema";
+import { getCachedPlatforms } from "@/lib/cache";
+import { contentPieces, contentPlatformLinks } from "@/lib/db/schema";
 import { eq, desc, inArray, and } from "drizzle-orm";
 
 export default async function NewsletterPage() {
@@ -22,7 +23,7 @@ export default async function NewsletterPage() {
   const links = ids.length > 0
     ? await db.select().from(contentPlatformLinks).where(inArray(contentPlatformLinks.contentId, ids))
     : [];
-  const platformRows = await db.select().from(platforms);
+  const platformRows = await getCachedPlatforms();
   const platMap = Object.fromEntries(platformRows.map(p => [p.id, p.slug]));
 
   const platByContent: Record<string, string[]> = {};
