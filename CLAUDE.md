@@ -8,34 +8,27 @@ Eckstein Podcast CMS — internal content management system for the Eckstein Pod
 
 ## Stack
 
-- **Framework:** Next.js 16 App Router via `@opennextjs/cloudflare` (OpenNext adapter)
-- **Runtime:** Cloudflare Workers (V8 Isolates) — no Node.js runtime, use Web APIs
-- **DB:** Cloudflare D1 (SQLite) via Drizzle ORM (`drizzle-orm/d1`, `sqliteTable`)
-- **Storage:** Cloudflare R2 for all media uploads
-- **Cache/Session:** Cloudflare KV
-- **Queues:** Cloudflare Queues for async jobs (analytics refresh)
-- **Crypto:** Web Crypto API only — no Node `crypto` module
+- **Framework:** Next.js 16 App Router
+- **Runtime:** Node.js on Vercel (Fluid Compute)
+- **DB:** Neon Postgres via Drizzle ORM (`drizzle-orm/neon-http`, `pgTable`)
+- **Storage:** Vercel Blob for all media uploads
+- **Crypto:** Web Crypto API (`crypto.subtle`) — works in both Node.js and edge
 - **Styling:** Tailwind CSS with custom design tokens
-- **Deploy target:** Cloudflare Workers & Pages (GitHub auto-deploy)
+- **Deploy:** Vercel (GitHub auto-deploy on `main`)
 
 ## Commands
 
 ```bash
-pnpm dev                          # Next.js dev server (local, fast iteration)
-pnpm preview                      # Miniflare/Wrangler local preview (Workers runtime)
-pnpm build                        # Next.js build
-pnpm opennextjs-cloudflare build  # Build for Cloudflare deployment
+pnpm dev              # Next.js dev server
+pnpm build            # Next.js build
+pnpm lint             # ESLint
 
-pnpm drizzle-kit generate         # Generate D1 SQL migrations from schema
-pnpm drizzle-kit studio           # Browse D1 data locally
-
-wrangler d1 execute eckstein-cms-db --file=migrations/0000_init.sql  # Apply migration
-wrangler d1 execute eckstein-cms-db --command "SELECT * FROM content_pieces"
-wrangler secret put ADMIN_PASSWORD   # Set production secrets
-wrangler deploy                      # Manual deploy
+pnpm db:generate      # Generate Postgres migrations from schema (drizzle-kit)
+pnpm db:push          # Push schema changes directly to DB (dev only)
+pnpm db:studio        # Browse DB locally via Drizzle Studio
 ```
 
-Local secrets go in `.dev.vars` (gitignored). See `.dev.vars.example` for all required keys.
+Local secrets go in `.env.local` (gitignored). See `.env.example` for all required keys.
 
 ## Architecture
 
@@ -43,8 +36,8 @@ Local secrets go in `.dev.vars` (gitignored). See `.dev.vars.example` for all re
 
 - `app/(auth)/login` — login page, the only unauthenticated route
 - `app/(cms)/` — all CMS routes, gated by `middleware.ts`
-- `app/api/cron/refresh-analytics` — called by Cloudflare Cron Trigger every 6h
-- `app/api/upload` — R2 multipart upload + signed URLs
+- `app/api/cron/refresh-analytics` — called by Vercel Cron every 6h (configured in `vercel.json`)
+- `app/api/upload` — Vercel Blob upload
 - `app/api/telegram/inbound` — Telegram webhook receiver
 - `app/api/vault/reveal` — decrypt and return a single vault entry field
 - `app/share/prep/[token]` — public read-only prep share (no auth)
@@ -58,17 +51,13 @@ Key relations:
 - `analytics_snapshots` — append-only, never update; one row per pull per link for trend history
 - `episode_preps` + `prep_sections` — episode prep workspace, linked to `content_pieces` after recording
 - `forum_threads` + `forum_replies` — mind-dump / brainstorm area
-- `vault_entries` — AES-256-GCM encrypted sensitive data
+- `vault_entries` — AES-256-GCM encrypted sensitive data (stored as base64 text)
 - `clip_queue` — timestamps from episodes queued as future shorts
 - `guests` — guest database, linked via `content_pieces.guest_id`
 
-### Workers Compatibility Rules
+### DB Client
 
-- **No `Buffer`** — use `Uint8Array`, `TextEncoder`, `TextDecoder`
-- **No `fs`** — no runtime file reads; bundle everything at build time
-- **No Node `crypto`** — use `crypto.subtle` (Web Crypto API) for all hashing/encryption
-- **No bcrypt** — use PBKDF2 via `crypto.subtle.deriveKey` for password key derivation
-- **D1 client** — accessed via `getRequestContext().env.DB`, not a direct connection string
+`lib/db/index.ts` exports `getDb()` — creates a Neon HTTP Drizzle client from `process.env.DATABASE_URL`. Call it directly in Server Components and API routes; no bindings needed.
 
 ### Auth Flow
 
@@ -76,20 +65,11 @@ Key relations:
 
 ### Vault Encryption
 
-All sensitive vault fields use AES-256-GCM via `lib/crypto.ts`. Key derived per-entry from `VAULT_MASTER_KEY` + per-row salt (PBKDF2). DB stores ciphertext + salt + IV as `blob`. Decryption only on-demand per field, never bulk. Every reveal writes to `vault_audit_log`.
+All sensitive vault fields use AES-256-GCM via `lib/crypto.ts`. `encryptPacked` produces a self-contained `Uint8Array` (16-byte salt + 12-byte IV + ciphertext), stored as base64 text. `decryptPacked` reverses it. Key derived from `VAULT_MASTER_KEY` via PBKDF2. Every reveal writes to `vault_audit_log`.
 
 ### Analytics Pull
 
-Cron runs `app/api/cron/refresh-analytics` every 6h. For each `content_platform_links` row with `external_id` and platform in `('youtube', 'yt_shorts', 'ig_reels', 'instagram')`, fetches stats and inserts a new `analytics_snapshots` row. Other platforms (Rumble, Spotify, TikTok, X, Substack) are entered manually via the edit form.
-
-### Cloudflare Bindings (`wrangler.toml`)
-
-| Binding | Type | Purpose |
-|---|---|---|
-| `DB` | D1 | Main database |
-| `MEDIA` | R2 | All file uploads |
-| `CACHE` | KV | Sessions, analytics cache, share-link tokens |
-| `ANALYTICS_QUEUE` | Queue | Async analytics refresh jobs |
+Vercel Cron calls `app/api/cron/refresh-analytics` every 6h (schedule in `vercel.json`). For each `content_platform_links` row with `external_id` and platform in `('youtube', 'yt_shorts', 'ig_reels', 'instagram')`, fetches stats and inserts a new `analytics_snapshots` row.
 
 ## Design System (strict — no deviations)
 
@@ -114,12 +94,10 @@ All primary buttons: `font-cinzel uppercase tracking-wider`. All buttons follow 
 
 | File | Purpose |
 |---|---|
-| `wrangler.toml` | All Cloudflare bindings, cron schedule, worker config |
-| `open-next.config.ts` | OpenNext adapter config |
+| `vercel.json` | Cron schedule |
 | `lib/db/schema.ts` | Single source of truth for all Drizzle table definitions |
-| `lib/crypto.ts` | AES-256-GCM encrypt/decrypt (Web Crypto only) |
-| `lib/auth.ts` | Cookie sign/verify (HMAC-SHA256 via Web Crypto) |
-| `lib/r2.ts` | R2 upload helpers |
+| `lib/db/index.ts` | Neon Drizzle client (`getDb()`) |
+| `lib/crypto.ts` | AES-256-GCM encrypt/decrypt (`encryptPacked` / `decryptPacked`) |
 | `middleware.ts` | Auth gate for all /(cms) routes |
 | `app/(cms)/layout.tsx` | Sidebar + top header shell |
 | `app/(cms)/page.tsx` | OHE dashboard (default landing after login) |
@@ -127,5 +105,5 @@ All primary buttons: `font-cinzel uppercase tracking-wider`. All buttons follow 
 ## GitHub
 
 Remote: `https://github.com/ritzaisolutions-dotcom/Eckstein-Podcast-CMS.git`
-Deploy: GitHub → Cloudflare Workers & Pages auto-deploy on `main`
+Deploy: GitHub → Vercel auto-deploy on `main`
 Domain target: `cms.eckstein-podcast.de`

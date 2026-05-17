@@ -1,10 +1,10 @@
-import { sqliteTable, text, integer, blob, primaryKey } from "drizzle-orm/sqlite-core";
+import { pgTable, text, integer, boolean, bigserial, serial, timestamp, primaryKey } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 // ─── Platforms (seeded, static) ──────────────────────────────────────────────
 
-export const platforms = sqliteTable("platforms", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const platforms = pgTable("platforms", {
+  id: serial("id").primaryKey(),
   slug: text("slug").notNull().unique(),
   label: text("label").notNull(),
   kind: text("kind").notNull(), // 'long' | 'short' | 'social' | 'blog'
@@ -13,7 +13,7 @@ export const platforms = sqliteTable("platforms", {
 
 // ─── Content Pieces (central table for all content types) ────────────────────
 
-export const contentPieces = sqliteTable("content_pieces", {
+export const contentPieces = pgTable("content_pieces", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   type: text("type").notNull(), // 'lfc' | 'sfc' | 'article' | 'newsletter' | 'social_post' | 'media'
   title: text("title").notNull(),
@@ -23,29 +23,25 @@ export const contentPieces = sqliteTable("content_pieces", {
   thumbnailUrl: text("thumbnail_url"),
   episodeNumber: integer("episode_number"),
   durationLabel: text("duration_label"),
-  hasPrayer: integer("has_prayer", { mode: "boolean" }).default(false),
+  hasPrayer: boolean("has_prayer").default(false),
   parentId: text("parent_id"),
   guestId: text("guest_id"),
   status: text("status").notNull().default("draft"), // 'draft' | 'scheduled' | 'published'
   createdBy: text("created_by").notNull().default("kevin"),
-  createdAt: integer("created_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch('now') * 1000)`),
-  uploadDate: integer("upload_date", { mode: "timestamp_ms" }),
-  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch('now') * 1000)`),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  uploadDate: timestamp("upload_date"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 // ─── Content Platform Links ───────────────────────────────────────────────────
 
-export const contentPlatformLinks = sqliteTable("content_platform_links", {
+export const contentPlatformLinks = pgTable("content_platform_links", {
   contentId: text("content_id").notNull(),
   platformId: integer("platform_id").notNull(),
   url: text("url"),
   caption: text("caption"),
-  scheduledAt: integer("scheduled_at", { mode: "timestamp_ms" }),
-  postedAt: integer("posted_at", { mode: "timestamp_ms" }),
+  scheduledAt: timestamp("scheduled_at"),
+  postedAt: timestamp("posted_at"),
   externalId: text("external_id"),
 }, (t) => ({
   pk: primaryKey({ columns: [t.contentId, t.platformId] }),
@@ -53,13 +49,11 @@ export const contentPlatformLinks = sqliteTable("content_platform_links", {
 
 // ─── Analytics Snapshots (append-only) ───────────────────────────────────────
 
-export const analyticsSnapshots = sqliteTable("analytics_snapshots", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const analyticsSnapshots = pgTable("analytics_snapshots", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
   contentId: text("content_id").notNull(),
   platformId: integer("platform_id").notNull(),
-  capturedAt: integer("captured_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch('now') * 1000)`),
+  capturedAt: timestamp("captured_at").notNull().defaultNow(),
   views: integer("views").default(0),
   likes: integer("likes").default(0),
   comments: integer("comments").default(0),
@@ -70,19 +64,17 @@ export const analyticsSnapshots = sqliteTable("analytics_snapshots", {
 
 // ─── Media Assets ─────────────────────────────────────────────────────────────
 
-export const mediaAssets = sqliteTable("media_assets", {
+export const mediaAssets = pgTable("media_assets", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   filename: text("filename").notNull(),
   blobUrl: text("blob_url").notNull(),
   mime: text("mime").notNull(),
   sizeBytes: integer("size_bytes"),
   tags: text("tags").default("[]"), // JSON array
-  uploadedAt: integer("uploaded_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch('now') * 1000)`),
+  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
 });
 
-export const mediaAssetLinks = sqliteTable("media_asset_links", {
+export const mediaAssetLinks = pgTable("media_asset_links", {
   assetId: text("asset_id").notNull(),
   contentId: text("content_id").notNull(),
   role: text("role").notNull(), // 'thumbnail' | 'clip' | 'prep_file' | 'show_notes_image' | 'audio_memo'
@@ -92,12 +84,12 @@ export const mediaAssetLinks = sqliteTable("media_asset_links", {
 
 // ─── Tags ─────────────────────────────────────────────────────────────────────
 
-export const tags = sqliteTable("tags", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const tags = pgTable("tags", {
+  id: serial("id").primaryKey(),
   name: text("name").notNull().unique(),
 });
 
-export const contentTags = sqliteTable("content_tags", {
+export const contentTags = pgTable("content_tags", {
   contentId: text("content_id").notNull(),
   tagId: integer("tag_id").notNull(),
 }, (t) => ({
@@ -106,20 +98,18 @@ export const contentTags = sqliteTable("content_tags", {
 
 // ─── Episode Tasks (Sunday-Drop Checkliste) ───────────────────────────────────
 
-export const episodeTasks = sqliteTable("episode_tasks", {
+export const episodeTasks = pgTable("episode_tasks", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   contentId: text("content_id").notNull(),
   label: text("label").notNull(),
-  done: integer("done", { mode: "boolean" }).notNull().default(false),
+  done: boolean("done").notNull().default(false),
   orderIndex: integer("order_index").notNull().default(0),
-  createdAt: integer("created_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch('now') * 1000)`),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 // ─── Reminder Templates ───────────────────────────────────────────────────────
 
-export const reminderTemplates = sqliteTable("reminder_templates", {
+export const reminderTemplates = pgTable("reminder_templates", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   triggerType: text("trigger_type").notNull(), // 'before_publish' | 'after_publish' | 'weekly'
   offsetDays: integer("offset_days").notNull().default(0),
@@ -130,79 +120,69 @@ export const reminderTemplates = sqliteTable("reminder_templates", {
 
 // ─── Caption Templates ────────────────────────────────────────────────────────
 
-export const captionTemplates = sqliteTable("caption_templates", {
+export const captionTemplates = pgTable("caption_templates", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   platformSlug: text("platform_slug").notNull(),
   name: text("name").notNull(),
   body: text("body").notNull(),
-  createdAt: integer("created_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch('now') * 1000)`),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 // ─── Clip Queue ───────────────────────────────────────────────────────────────
 
-export const clipQueue = sqliteTable("clip_queue", {
+export const clipQueue = pgTable("clip_queue", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   contentId: text("content_id").notNull(),
   timestampSec: integer("timestamp_sec"),
   note: text("note"),
   status: text("status").notNull().default("timestamp_marked"), // 'timestamp_marked' | 'caption_ready' | 'exported' | 'posted'
   clipContentId: text("clip_content_id"),
-  createdAt: integer("created_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch('now') * 1000)`),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 // ─── Guests ───────────────────────────────────────────────────────────────────
 
-export const guests = sqliteTable("guests", {
+export const guests = pgTable("guests", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   bioMd: text("bio_md"),
   photoUrl: text("photo_url"),
   socials: text("socials").default("{}"), // JSON: {instagram, x, linkedin, website}
-  contactEnc: blob("contact_enc"),
+  contactEnc: text("contact_enc"), // base64-encoded encrypted blob
   topics: text("topics").default("[]"), // JSON array
   status: text("status").notNull().default("angefragt"), // 'angefragt' | 'zugesagt' | 'aufgenommen' | 'mehrfach'
-  notesEnc: blob("notes_enc"),
-  createdAt: integer("created_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch('now') * 1000)`),
+  notesEnc: text("notes_enc"), // base64-encoded encrypted blob
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 // ─── Episode Preps ────────────────────────────────────────────────────────────
 
-export const episodePreps = sqliteTable("episode_preps", {
+export const episodePreps = pgTable("episode_preps", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   episodeNumber: integer("episode_number"),
   workingTitle: text("working_title").notNull(),
-  templateSlug: text("template_slug").notNull().default("standard"), // 'standard' | 'gast' | 'solo' | 'streit'
+  templateSlug: text("template_slug").notNull().default("standard"),
   status: text("status").notNull().default("sammeln"), // 'sammeln' | 'strukturieren' | 'ready_to_record' | 'recorded'
-  plannedDate: integer("planned_date", { mode: "timestamp_ms" }),
+  plannedDate: timestamp("planned_date"),
   linkedContentId: text("linked_content_id"),
   createdBy: text("created_by").notNull().default("kevin"),
-  createdAt: integer("created_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch('now') * 1000)`),
-  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch('now') * 1000)`),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-export const prepSections = sqliteTable("prep_sections", {
+export const prepSections = pgTable("prep_sections", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   prepId: text("prep_id").notNull(),
-  slug: text("slug").notNull(), // 'kernfrage' | 'roter_faden' | 'argumente_kevin' | etc.
+  slug: text("slug").notNull(),
   label: text("label").notNull(),
   bodyMd: text("body_md").default(""),
   status: text("status").notNull().default("offen"), // 'offen' | 'bearbeitet' | 'final'
   orderIndex: integer("order_index").notNull().default(0),
   lastEditedBy: text("last_edited_by"),
-  lastEditedAt: integer("last_edited_at", { mode: "timestamp_ms" }),
+  lastEditedAt: timestamp("last_edited_at"),
 });
 
-export const prepAttachments = sqliteTable("prep_attachments", {
+export const prepAttachments = pgTable("prep_attachments", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   prepId: text("prep_id").notNull(),
   sectionId: text("section_id"),
@@ -211,39 +191,33 @@ export const prepAttachments = sqliteTable("prep_attachments", {
   mime: text("mime").notNull(),
   sizeBytes: integer("size_bytes"),
   uploadedBy: text("uploaded_by").notNull().default("kevin"),
-  uploadedAt: integer("uploaded_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch('now') * 1000)`),
+  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
 });
 
-export const prepComments = sqliteTable("prep_comments", {
+export const prepComments = pgTable("prep_comments", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   prepId: text("prep_id").notNull(),
   sectionId: text("section_id"),
   bodyMd: text("body_md").notNull(),
   author: text("author").notNull().default("kevin"),
   mentions: text("mentions").default("[]"), // JSON array
-  resolved: integer("resolved", { mode: "boolean" }).notNull().default(false),
-  createdAt: integer("created_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch('now') * 1000)`),
+  resolved: boolean("resolved").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const prepShareLinks = sqliteTable("prep_share_links", {
+export const prepShareLinks = pgTable("prep_share_links", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   prepId: text("prep_id").notNull(),
   token: text("token").notNull().unique(),
   passwordHash: text("password_hash"),
-  expiresAt: integer("expires_at", { mode: "timestamp_ms" }),
-  readOnly: integer("read_only", { mode: "boolean" }).notNull().default(true),
-  createdAt: integer("created_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch('now') * 1000)`),
+  expiresAt: timestamp("expires_at"),
+  readOnly: boolean("read_only").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 // ─── Mind Dump (Forum) ────────────────────────────────────────────────────────
 
-export const forumThreads = sqliteTable("forum_threads", {
+export const forumThreads = pgTable("forum_threads", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   title: text("title").notNull(),
   bodyMd: text("body_md").default(""),
@@ -254,15 +228,11 @@ export const forumThreads = sqliteTable("forum_threads", {
   tags: text("tags").default("[]"), // JSON array
   reactions: text("reactions").default("{}"), // JSON: {fire: 0, star: 0, thumbs_up: 0}
   convertedTo: text("converted_to"),
-  createdAt: integer("created_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch('now') * 1000)`),
-  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch('now') * 1000)`),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-export const forumReplies = sqliteTable("forum_replies", {
+export const forumReplies = pgTable("forum_replies", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   threadId: text("thread_id").notNull(),
   bodyMd: text("body_md").notNull(),
@@ -270,14 +240,12 @@ export const forumReplies = sqliteTable("forum_replies", {
   source: text("source").notNull().default("cms"),
   telegramMsgId: text("telegram_msg_id"),
   mediaUrl: text("media_url"),
-  createdAt: integer("created_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch('now') * 1000)`),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 // ─── Vault ────────────────────────────────────────────────────────────────────
 
-export const vaultEntries = sqliteTable("vault_entries", {
+export const vaultEntries = pgTable("vault_entries", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   category: text("category").notNull(), // 'platform' | 'infra' | 'mail' | 'payment' | 'tool' | 'misc'
   platformSlug: text("platform_slug"),
@@ -285,28 +253,23 @@ export const vaultEntries = sqliteTable("vault_entries", {
   loginUrl: text("login_url"),
   username: text("username"),
   email: text("email"),
-  passwordEnc: blob("password_enc"),
-  passwordSalt: blob("password_salt"),
-  passwordIv: blob("password_iv"),
-  recoveryCodesEnc: blob("recovery_codes_enc"),
-  apiTokensEnc: blob("api_tokens_enc"),
-  notesEnc: blob("notes_enc"),
-  quickLinks: text("quick_links").default("[]"), // JSON: [{label, url}]
+  // encryptPacked blobs stored as base64 text (Postgres bytea via text is simpler cross-env)
+  passwordEnc: text("password_enc"),
+  passwordSalt: text("password_salt"), // kept for schema compat, unused by encryptPacked
+  passwordIv: text("password_iv"),     // kept for schema compat, unused by encryptPacked
+  recoveryCodesEnc: text("recovery_codes_enc"),
+  apiTokensEnc: text("api_tokens_enc"),
+  notesEnc: text("notes_enc"),
+  quickLinks: text("quick_links").default("[]"),
   tags: text("tags").default("[]"),
-  lastRotatedAt: integer("last_rotated_at", { mode: "timestamp_ms" }),
-  createdAt: integer("created_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch('now') * 1000)`),
-  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch('now') * 1000)`),
+  lastRotatedAt: timestamp("last_rotated_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-export const vaultAuditLog = sqliteTable("vault_audit_log", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const vaultAuditLog = pgTable("vault_audit_log", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
   entryId: text("entry_id").notNull(),
   action: text("action").notNull(), // 'view' | 'reveal' | 'copy' | 'create' | 'update' | 'delete'
-  at: integer("at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch('now') * 1000)`),
+  at: timestamp("at").notNull().defaultNow(),
 });

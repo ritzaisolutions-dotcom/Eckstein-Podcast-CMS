@@ -2,102 +2,62 @@ import { NextRequest, NextResponse } from "next/server";
 import { inArray } from "drizzle-orm";
 import { getDb, contentPlatformLinks, platforms, analyticsSnapshots } from "@/lib/db";
 
-// Called by Cloudflare Cron Trigger: 0 */6 * * *
+// Called by Vercel Cron: schedule in vercel.json
 // Manually: GET /api/cron/refresh-analytics with X-Cron-Secret header
 export async function GET(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    if (req.headers.get("x-cron-secret") !== cronSecret) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  if (cronSecret && req.headers.get("x-cron-secret") !== cronSecret) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const youtubeKey = process.env.YOUTUBE_API_KEY;
   const igToken = process.env.IG_ACCESS_TOKEN;
-
   const results: { platform: string; updated: number; errors: string[] }[] = [];
 
-  let db: ReturnType<typeof getDb> | null = null;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { getRequestContext } = require("@opennextjs/cloudflare");
-    const { env } = getRequestContext();
-    if (env.DB) db = getDb(env.DB as D1Database);
-  } catch {
-    // local dev without wrangler — skip DB operations
-  }
-
-  if (!db) {
-    return NextResponse.json({ ok: true, pulledAt: new Date().toISOString(), results: [], note: "No DB binding (local dev)" });
-  }
+  const db = getDb();
 
   // ── YouTube ────────────────────────────────────────────────────────────────
   if (youtubeKey) {
     const ytErrors: string[] = [];
     try {
-      // Get all links for youtube / yt_shorts that have an external_id
       const ytPlatforms = await db
         .select({ id: platforms.id })
         .from(platforms)
         .where(inArray(platforms.slug, ["youtube", "yt_shorts"]));
 
       const ytPlatformIds = ytPlatforms.map(p => p.id);
-
       if (ytPlatformIds.length > 0) {
         const links = await db
           .select()
           .from(contentPlatformLinks)
-          .where(
-            inArray(contentPlatformLinks.platformId, ytPlatformIds),
-          );
+          .where(inArray(contentPlatformLinks.platformId, ytPlatformIds));
 
         const linksWithId = links.filter(l => l.externalId);
+        let totalUpdated = 0;
 
-        if (linksWithId.length > 0) {
-          // YouTube API allows up to 50 IDs per request
-          const chunks: typeof linksWithId[] = [];
-          for (let i = 0; i < linksWithId.length; i += 50) {
-            chunks.push(linksWithId.slice(i, i + 50));
+        for (let i = 0; i < linksWithId.length; i += 50) {
+          const chunk = linksWithId.slice(i, i + 50);
+          const ids = chunk.map(l => l.externalId!).join(",");
+          const res = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${ids}&key=${youtubeKey}`);
+          if (!res.ok) { ytErrors.push(`YouTube API ${res.status}`); continue; }
+          const data = await res.json() as {
+            items?: Array<{ id: string; statistics: { viewCount?: string; likeCount?: string; commentCount?: string } }>;
+          };
+          for (const item of data.items ?? []) {
+            const link = chunk.find(l => l.externalId === item.id);
+            if (!link) continue;
+            await db.insert(analyticsSnapshots).values({
+              contentId: link.contentId,
+              platformId: link.platformId,
+              views: parseInt(item.statistics.viewCount ?? "0", 10),
+              likes: parseInt(item.statistics.likeCount ?? "0", 10),
+              comments: parseInt(item.statistics.commentCount ?? "0", 10),
+              source: "api",
+            });
+            totalUpdated++;
           }
-
-          let totalUpdated = 0;
-          for (const chunk of chunks) {
-            const ids = chunk.map(l => l.externalId!).join(",");
-            const url = `https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${ids}&key=${youtubeKey}`;
-            const res = await fetch(url);
-            if (!res.ok) {
-              ytErrors.push(`YouTube API ${res.status}: ${await res.text()}`);
-              continue;
-            }
-            const data = await res.json() as {
-              items?: Array<{
-                id: string;
-                statistics: {
-                  viewCount?: string;
-                  likeCount?: string;
-                  commentCount?: string;
-                };
-              }>;
-            };
-
-            for (const item of data.items ?? []) {
-              const link = chunk.find(l => l.externalId === item.id);
-              if (!link) continue;
-              await db.insert(analyticsSnapshots).values({
-                contentId: link.contentId,
-                platformId: link.platformId,
-                views: parseInt(item.statistics.viewCount ?? "0", 10),
-                likes: parseInt(item.statistics.likeCount ?? "0", 10),
-                comments: parseInt(item.statistics.commentCount ?? "0", 10),
-                source: "api",
-              });
-              totalUpdated++;
-            }
-          }
-          results.push({ platform: "youtube", updated: totalUpdated, errors: ytErrors });
-        } else {
-          results.push({ platform: "youtube", updated: 0, errors: [] });
         }
+        results.push({ platform: "youtube", updated: totalUpdated, errors: ytErrors });
       }
     } catch (e) {
       results.push({ platform: "youtube", updated: 0, errors: [String(e)] });
@@ -114,7 +74,6 @@ export async function GET(req: NextRequest) {
         .where(inArray(platforms.slug, ["instagram", "ig_reels"]));
 
       const igPlatformIds = igPlatforms.map(p => p.id);
-
       if (igPlatformIds.length > 0) {
         const links = await db
           .select()
@@ -126,18 +85,9 @@ export async function GET(req: NextRequest) {
 
         for (const link of linksWithId) {
           try {
-            const url = `https://graph.facebook.com/v20.0/${link.externalId}?fields=like_count,comments_count,reach,impressions&access_token=${igToken}`;
-            const res = await fetch(url);
-            if (!res.ok) {
-              igErrors.push(`IG ${link.externalId}: ${res.status}`);
-              continue;
-            }
-            const data = await res.json() as {
-              like_count?: number;
-              comments_count?: number;
-              reach?: number;
-              impressions?: number;
-            };
+            const res = await fetch(`https://graph.facebook.com/v20.0/${link.externalId}?fields=like_count,comments_count,reach,impressions&access_token=${igToken}`);
+            if (!res.ok) { igErrors.push(`IG ${link.externalId}: ${res.status}`); continue; }
+            const data = await res.json() as { like_count?: number; comments_count?: number; reach?: number; impressions?: number };
             await db.insert(analyticsSnapshots).values({
               contentId: link.contentId,
               platformId: link.platformId,
@@ -158,9 +108,5 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({
-    ok: true,
-    pulledAt: new Date().toISOString(),
-    results,
-  });
+  return NextResponse.json({ ok: true, pulledAt: new Date().toISOString(), results });
 }
