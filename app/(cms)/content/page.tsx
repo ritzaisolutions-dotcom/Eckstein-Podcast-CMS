@@ -154,7 +154,8 @@ export default async function ContentPage({
           <table className="cms-table w-full">
             <thead>
               <tr>
-                <th className="pl-4">Titel</th>
+                <th className="pl-4 w-16">ID</th>
+                <th>Titel</th>
                 <th>Typ</th>
                 <th>Status</th>
                 <th>Erstellt</th>
@@ -168,11 +169,19 @@ export default async function ContentPage({
                 const platSlugs = platformByContentId[piece.id] ?? [];
                 const views = viewsMap[piece.id] ?? 0;
                 return (
-                  <tr
-                    key={piece.id}
-                    className="cursor-pointer"
-                    onClick={undefined}
-                  >
+                  <tr key={piece.id}>
+                    <td className="pl-4 shrink-0">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs font-mono" style={{ color: "var(--gold)", fontFamily: "var(--font-cinzel)", fontSize: "0.6rem" }}>
+                          #{piece.contentId}
+                        </span>
+                        {piece.typeIndex && (
+                          <span className="text-xs" style={{ color: "var(--text-muted)", fontFamily: "var(--font-cinzel)", fontSize: "0.52rem" }}>
+                            {(piece.type ?? "").toUpperCase()}-{piece.typeIndex}
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="pl-4">
                       <Link href={`/episodes/${piece.id}`} className="hover:underline block" style={{ color: "var(--text-primary)", fontFamily: "var(--font-eb-garamond)" }}>
                         {piece.episodeNumber ? <span className="text-xs mr-1.5" style={{ color: "var(--text-muted)" }}>#{piece.episodeNumber}</span> : null}

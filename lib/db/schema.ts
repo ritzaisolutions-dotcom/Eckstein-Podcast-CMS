@@ -15,7 +15,9 @@ export const platforms = pgTable("platforms", {
 
 export const contentPieces = pgTable("content_pieces", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  type: text("type").notNull(), // 'lfc' | 'sfc' | 'article' | 'newsletter' | 'social_post' | 'media'
+  contentId: serial("content_id"), // global auto-increment across all types
+  typeIndex: integer("type_index"),  // per-type counter (set on insert)
+  type: text("type").notNull(), // 'lfc' | 'sfc' | 'article' | 'social_post'
   title: text("title").notNull(),
   slug: text("slug"),
   bio: text("bio"),

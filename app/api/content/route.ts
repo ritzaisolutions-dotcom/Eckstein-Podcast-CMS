@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { contentPieces, contentPlatformLinks, platforms } from "@/lib/db/schema";
+import { eq, count } from "drizzle-orm";
+
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const {
@@ -16,9 +18,17 @@ export async function POST(req: NextRequest) {
   const db = getDb();
   const id = crypto.randomUUID();
 
+  // Calculate next typeIndex for this content type
+  const [{ cnt }] = await db
+    .select({ cnt: count() })
+    .from(contentPieces)
+    .where(eq(contentPieces.type, type));
+  const typeIndex = Number(cnt) + 1;
+
   await db.insert(contentPieces).values({
     id,
     type,
+    typeIndex,
     title,
     bio: bio || null,
     bodyMd: bodyMd || null,
