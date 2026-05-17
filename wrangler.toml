@@ -1,0 +1,49 @@
+name = "eckstein-cms"
+main = ".open-next/worker.js"
+compatibility_date = "2025-05-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "eckstein-cms-db"
+database_id = "REPLACE_WITH_ID_FROM_wrangler_d1_create"
+
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "eckstein-cms-media"
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = "REPLACE_WITH_ID_FROM_wrangler_kv_namespace_create"
+
+[[queues.producers]]
+binding = "ANALYTICS_QUEUE"
+queue = "analytics-refresh"
+
+[[queues.consumers]]
+queue = "analytics-refresh"
+max_batch_size = 10
+max_batch_timeout = 30
+
+[triggers]
+crons = ["0 */6 * * *"]
+
+[vars]
+NODE_ENV = "production"
+
+# Secrets set via: wrangler secret put <NAME>
+# ADMIN_PASSWORD
+# SESSION_SECRET
+# VAULT_MASTER_KEY
+# YOUTUBE_API_KEY
+# IG_ACCESS_TOKEN
+# IG_BUSINESS_ID
+# TELEGRAM_BOT_TOKEN
+# TELEGRAM_WEBHOOK_SECRET
+# TELEGRAM_ALLOWED_CHAT_IDS
+# TURNSTILE_SITE_KEY
+# TURNSTILE_SECRET_KEY
+
+[dev]
+port = 8788
+local_protocol = "http"

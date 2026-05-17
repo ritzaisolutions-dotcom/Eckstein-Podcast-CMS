@@ -1,0 +1,181 @@
+@import "tailwindcss";
+
+/* ─── Eckstein Design Tokens ──────────────────────────────────────────────── */
+:root {
+  --navy:       #05101f;
+  --navy-2:     #081525;
+  --navy-3:     #0c1e35;
+  --gold:       #c9a84c;
+  --gold-light: #e2c06a;
+  --gold-pale:  #f0dca0;
+  --cream:      #f5eed8;
+  --cream-dim:  rgba(245, 238, 216, 0.55);
+  --cream-light: #faf6e6;
+  --cream-mid:  #ede5c4;
+
+  /* Semantic */
+  --bg-app:     var(--cream);
+  --bg-surface: var(--cream-light);
+  --bg-surface-2: var(--cream-mid);
+  --text-primary: var(--navy);
+  --text-secondary: var(--navy-3);
+  --text-muted: rgba(5, 16, 31, 0.45);
+  --border: rgba(12, 30, 53, 0.12);
+  --border-strong: var(--navy-3);
+  --shadow: rgba(5, 16, 31, 0.08);
+}
+
+@theme inline {
+  --color-navy:        #05101f;
+  --color-navy-2:      #081525;
+  --color-navy-3:      #0c1e35;
+  --color-gold:        #c9a84c;
+  --color-gold-light:  #e2c06a;
+  --color-gold-pale:   #f0dca0;
+  --color-cream:       #f5eed8;
+  --color-cream-light: #faf6e6;
+  --color-cream-mid:   #ede5c4;
+
+  --font-display:  var(--font-cinzel);
+  --font-subhead:  var(--font-cormorant);
+  --font-body:     var(--font-eb-garamond);
+}
+
+/* ─── Base ───────────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  font-family: var(--font-eb-garamond), Georgia, serif;
+  line-height: 1.65;
+  min-height: 100dvh;
+}
+
+/* ─── Typography ─────────────────────────────────────────────────────────── */
+h1, h2, h3 {
+  font-family: var(--font-cinzel), serif;
+  color: var(--navy);
+  letter-spacing: 0.03em;
+  line-height: 1.2;
+}
+
+h4, h5, h6 {
+  font-family: var(--font-cormorant), serif;
+  color: var(--navy-3);
+  font-style: italic;
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--cream-mid); }
+::-webkit-scrollbar-thumb { background: rgba(5,16,31,0.25); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--gold); }
+
+/* ─── Selection ──────────────────────────────────────────────────────────── */
+::selection { background: rgba(201, 168, 76, 0.3); color: var(--navy); }
+
+/* ─── Focus Ring ─────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* ─── Login screen override (navy background) ────────────────────────────── */
+.login-screen {
+  background-color: var(--navy);
+  min-height: 100dvh;
+}
+
+/* ─── CMS Card utility ───────────────────────────────────────────────────── */
+.cms-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 1px 3px var(--shadow);
+}
+
+.cms-card-title {
+  font-family: var(--font-cinzel);
+  font-size: 0.7rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--navy);
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+/* ─── Table utility ──────────────────────────────────────────────────────── */
+.cms-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-eb-garamond);
+  font-size: 0.95rem;
+}
+
+.cms-table th {
+  text-align: left;
+  font-family: var(--font-cinzel);
+  font-size: 0.58rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-surface-2);
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+}
+
+.cms-table td {
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+  vertical-align: middle;
+}
+
+.cms-table tr:hover td {
+  background: var(--bg-surface-2);
+}
+
+/* ─── Input utility ──────────────────────────────────────────────────────── */
+.cms-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-primary);
+  font-family: var(--font-eb-garamond);
+  font-size: 1rem;
+  transition: border-color 0.15s;
+  outline: none;
+}
+
+.cms-input:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(201,168,76,0.15);
+}
+
+.cms-input::placeholder {
+  color: var(--text-muted);
+}
+
+.cms-label {
+  display: block;
+  font-family: var(--font-cinzel);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 0.35rem;
+  font-weight: 600;
+}
