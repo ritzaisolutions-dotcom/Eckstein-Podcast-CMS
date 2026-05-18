@@ -93,14 +93,13 @@ export default function Sidebar() {
         {/* Logo */}
         <div className="px-4 py-4 border-b" style={{ borderColor: "var(--border)" }}>
           <Link href="/" className="flex items-center gap-2.5">
-            {/* Geometric E•S monogram: diamond outline + inner solid + E letterform */}
-            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
-              <polygon points="16,2 30,16 16,30 2,16" stroke="#c9a84c" strokeWidth="1.5" fill="none"/>
-              <polygon points="16,7 25,16 16,25 7,16" fill="#05101f"/>
-              <line x1="12" y1="12" x2="12" y2="20" stroke="#c9a84c" strokeWidth="1.5" strokeLinecap="round"/>
-              <line x1="12" y1="12" x2="19" y2="12" stroke="#c9a84c" strokeWidth="1.5" strokeLinecap="round"/>
-              <line x1="12" y1="16" x2="18" y2="16" stroke="#c9a84c" strokeWidth="1.25" strokeLinecap="round"/>
-              <line x1="12" y1="20" x2="19" y2="20" stroke="#c9a84c" strokeWidth="1.5" strokeLinecap="round"/>
+            <svg width="36" height="36" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
+              <polygon points="50,4 96,50 50,96 4,50" stroke="#c9a84c" strokeWidth="4" fill="#f5eed8"/>
+              <polygon points="50,18 82,50 50,82 18,50" fill="#05101f"/>
+              <line x1="38" y1="36" x2="38" y2="64" stroke="#c9a84c" strokeWidth="5" strokeLinecap="butt"/>
+              <line x1="38" y1="36" x2="63" y2="36" stroke="#c9a84c" strokeWidth="5" strokeLinecap="butt"/>
+              <line x1="38" y1="50" x2="60" y2="50" stroke="#c9a84c" strokeWidth="4" strokeLinecap="butt"/>
+              <line x1="38" y1="64" x2="63" y2="64" stroke="#c9a84c" strokeWidth="5" strokeLinecap="butt"/>
             </svg>
             <div>
               <div
