@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
-import { contentPieces, contentPlatformLinks, platforms } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import {
+  contentPieces, contentPlatformLinks, platforms,
+  analyticsSnapshots, mediaAssetLinks, contentTags,
+  episodeTasks, clipQueue, episodePreps,
+} from "@/lib/db/schema";
+import { eq, or } from "drizzle-orm";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -30,6 +34,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const {
     type, title, bio, bodyMd, episodeNumber,
     lifecycleStage, uploadDate, filmingDate,
+    parentId,
     platformLinks = [],
   } = body;
 
@@ -46,6 +51,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       uploadDate: uploadDate ? new Date(uploadDate) : null,
       filmingDate: filmingDate ? new Date(filmingDate) : null,
       status: lifecycleStage === "live" ? "published" : "draft",
+      parentId: parentId ?? null,
       updatedAt: new Date(),
     })
     .where(eq(contentPieces.id, id));
@@ -81,10 +87,29 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const { id } = await params;
   const db = getDb();
 
-  await db.delete(contentPlatformLinks).where(eq(contentPlatformLinks.contentId, id));
+  // Clear parent references on child SFCs before deleting
+  await db.update(contentPieces)
+    .set({ parentId: null })
+    .where(eq(contentPieces.parentId, id));
+
+  // Clear linkedContentId on prep docs
+  await db.update(episodePreps)
+    .set({ linkedContentId: null })
+    .where(eq(episodePreps.linkedContentId, id));
+
+  // Delete all rows that directly reference this content piece
+  await Promise.all([
+    db.delete(contentPlatformLinks).where(eq(contentPlatformLinks.contentId, id)),
+    db.delete(analyticsSnapshots).where(eq(analyticsSnapshots.contentId, id)),
+    db.delete(mediaAssetLinks).where(eq(mediaAssetLinks.contentId, id)),
+    db.delete(contentTags).where(eq(contentTags.contentId, id)),
+    db.delete(episodeTasks).where(eq(episodeTasks.contentId, id)),
+    db.delete(clipQueue).where(
+      or(eq(clipQueue.contentId, id), eq(clipQueue.clipContentId, id))
+    ),
+  ]);
+
   await db.delete(contentPieces).where(eq(contentPieces.id, id));
-
-
 
   return NextResponse.json({ ok: true });
 }

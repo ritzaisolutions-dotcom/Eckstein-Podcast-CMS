@@ -3,6 +3,14 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Button from "./ui/Button";
+import LfcPickerModal from "./LfcPickerModal";
+
+interface ParentLfc {
+  id: string;
+  title: string;
+  episodeNumber: number | null;
+  typeIndex: number | null;
+}
 
 // ─── Platform definitions per content type ────────────────────────────────────
 
@@ -90,6 +98,8 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(!!episodeId);
+  const [parentLfc, setParentLfc] = useState<ParentLfc | null>(null);
+  const [showLfcPicker, setShowLfcPicker] = useState(false);
 
   const availablePlatforms = PLATFORMS_BY_TYPE[contentType] ?? [];
 
@@ -114,6 +124,18 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
           const linksMap: Record<string, PlatformLink> = {};
           for (const l of data.platformLinks) linksMap[l.slug] = l;
           setPlatformLinks(linksMap);
+        }
+
+        if (data.parentId && data.type === "sfc") {
+          fetch(`/api/content/${data.parentId}`)
+            .then(r => r.json())
+            .then(parent => setParentLfc({
+              id: parent.id,
+              title: parent.title,
+              episodeNumber: parent.episodeNumber,
+              typeIndex: parent.typeIndex,
+            }))
+            .catch(() => {});
         }
       })
       .catch(() => setError("Fehler beim Laden"))
@@ -143,6 +165,12 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
     setContentType(t);
     setSelectedPlatforms(new Set());
     setPlatformLinks({});
+    if (t === "sfc") {
+      setParentLfc(null);
+      setShowLfcPicker(true);
+    } else {
+      setParentLfc(null);
+    }
   }
 
   async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
@@ -161,6 +189,7 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
       lifecycleStage,
       uploadDate: uploadDate || null,
       filmingDate: null,
+      parentId: contentType === "sfc" ? (parentLfc?.id ?? null) : null,
       platformLinks: links,
     };
 
@@ -194,6 +223,14 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
   }
 
   return (
+    <>
+    {showLfcPicker && (
+      <LfcPickerModal
+        onSelect={lfc => { setParentLfc(lfc); setShowLfcPicker(false); }}
+        onSkip={() => setShowLfcPicker(false)}
+      />
+    )}
+
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
 
       {error && (
@@ -237,6 +274,63 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
           </div>
         </div>
       </div>
+
+      {/* LFC Parent Link (only for SFC) */}
+      {contentType === "sfc" && (
+        <div className="cms-card flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <h2 className="cms-card-title">Verknüpfte LFC-Episode</h2>
+            <button
+              type="button"
+              onClick={() => setShowLfcPicker(true)}
+              className="text-xs px-3 py-1 rounded border transition-colors"
+              style={{
+                borderColor: "var(--border)",
+                color: "var(--text-muted)",
+                fontFamily: "var(--font-cinzel)",
+                letterSpacing: "0.07em",
+                fontSize: "0.6rem",
+              }}
+            >
+              {parentLfc ? "Ändern" : "Verknüpfen"}
+            </button>
+          </div>
+
+          {parentLfc ? (
+            <div
+              className="flex items-center justify-between px-3 py-2.5 rounded border"
+              style={{ borderColor: "var(--gold)", background: "rgba(201,168,76,0.08)" }}
+            >
+              <div className="flex items-baseline gap-2">
+                <span className="text-xs" style={{ color: "var(--gold)", fontFamily: "var(--font-cinzel)", fontSize: "0.58rem", letterSpacing: "0.07em" }}>
+                  LFC
+                </span>
+                {parentLfc.episodeNumber && (
+                  <span className="text-xs" style={{ color: "var(--text-muted)", fontFamily: "var(--font-cinzel)", fontSize: "0.6rem" }}>
+                    #{parentLfc.episodeNumber}
+                  </span>
+                )}
+                <span className="text-sm" style={{ color: "var(--text-primary)", fontFamily: "var(--font-eb-garamond)" }}>
+                  {parentLfc.title}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setParentLfc(null)}
+                className="ml-3 text-xs shrink-0"
+                style={{ color: "var(--text-muted)", fontFamily: "var(--font-cinzel)" }}
+                title="Verknüpfung entfernen"
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <p className="text-xs" style={{ color: "var(--text-muted)", fontStyle: "italic", fontFamily: "var(--font-eb-garamond)" }}>
+              Kein LFC verknüpft — dieser Short steht eigenständig.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Basic info */}
       <div className="cms-card flex flex-col gap-4">
@@ -420,5 +514,6 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
         </Button>
       </div>
     </form>
+    </>
   );
 }

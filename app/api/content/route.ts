@@ -1,13 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { contentPieces, contentPlatformLinks, platforms } from "@/lib/db/schema";
-import { eq, count } from "drizzle-orm";
+import { eq, count, and, ilike, desc } from "drizzle-orm";
+
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const type = searchParams.get("type") ?? "lfc";
+  const q = searchParams.get("q") ?? "";
+
+  const db = getDb();
+  const conditions = [eq(contentPieces.type, type)];
+  if (q) conditions.push(ilike(contentPieces.title, `%${q}%`));
+
+  const pieces = await db
+    .select({
+      id: contentPieces.id,
+      title: contentPieces.title,
+      episodeNumber: contentPieces.episodeNumber,
+      typeIndex: contentPieces.typeIndex,
+    })
+    .from(contentPieces)
+    .where(and(...conditions))
+    .orderBy(desc(contentPieces.createdAt))
+    .limit(50);
+
+  return NextResponse.json(pieces);
+}
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const {
     type, title, bio, bodyMd, episodeNumber,
     lifecycleStage, uploadDate, filmingDate,
+    parentId,
     platformLinks = [],
   } = body;
 
@@ -37,6 +62,7 @@ export async function POST(req: NextRequest) {
     uploadDate: uploadDate ? new Date(uploadDate) : null,
     filmingDate: filmingDate ? new Date(filmingDate) : null,
     status: lifecycleStage === "live" ? "published" : "draft",
+    parentId: parentId || null,
   });
 
   // Insert platform links if any
