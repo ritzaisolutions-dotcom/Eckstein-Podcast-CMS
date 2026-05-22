@@ -1,4 +1,5 @@
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { getCachedPlatforms, getCachedContentCounts } from "@/lib/cache";
@@ -48,6 +49,7 @@ export default async function Dashboard() {
     newIdeas,
     latestPublished,
     recentIdeas,
+    platViews,
   ] = await Promise.all([
     getCachedContentCounts(),
     getCachedPlatforms(),
@@ -120,49 +122,47 @@ export default async function Dashboard() {
       .from(forumThreads)
       .orderBy(desc(forumThreads.createdAt))
       .limit(4),
+
+    // Platform performance aggregate
+    db.select({
+        platformId: analyticsSnapshots.platformId,
+        views: sql<number>`SUM(${analyticsSnapshots.views})`.as("views"),
+      })
+      .from(analyticsSnapshots)
+      .groupBy(analyticsSnapshots.platformId)
+      .orderBy(desc(sql`SUM(${analyticsSnapshots.views})`))
+      .limit(4),
   ]);
 
   const platformMap = Object.fromEntries(platformRows.map(p => [p.id, p.slug]));
   const newIdeasCount = Number(newIdeas[0]?.cnt ?? 0);
 
-  // Episode tasks for ampel
+  // Episode tasks + KPI snaps fetched in parallel (second batch)
   const recentEpIds = recentEps.map(e => e.id);
-  const allTasks = recentEpIds.length > 0
-    ? await db.select().from(episodeTasks).where(inArray(episodeTasks.contentId, recentEpIds))
-    : [];
+  type EpisodeTask = typeof episodeTasks.$inferSelect;
+  type KpiSnap = { views: number };
+  const [allTasks, kpiSnaps] = await Promise.all([
+    recentEpIds.length > 0
+      ? db.select().from(episodeTasks).where(inArray(episodeTasks.contentId, recentEpIds))
+      : Promise.resolve([] as EpisodeTask[]),
+    latestPublished.length > 0
+      ? db.select({ views: analyticsSnapshots.views })
+          .from(analyticsSnapshots)
+          .where(eq(analyticsSnapshots.contentId, latestPublished[0].id))
+          .orderBy(desc(analyticsSnapshots.capturedAt))
+          .limit(2)
+      : Promise.resolve([] as KpiSnap[]),
+  ]);
+
   const tasksByEp: Record<string, typeof allTasks> = {};
   for (const t of allTasks) {
     if (!tasksByEp[t.contentId]) tasksByEp[t.contentId] = [];
     tasksByEp[t.contentId].push(t);
   }
 
-  // KPI
-  let kpiViews = 0;
-  let kpiPrevViews = 0;
-  let kpiNumber: number | null = null;
-  if (latestPublished.length > 0) {
-    const ep = latestPublished[0];
-    kpiNumber = ep.episodeNumber;
-    const snaps = await db
-      .select({ views: analyticsSnapshots.views })
-      .from(analyticsSnapshots)
-      .where(eq(analyticsSnapshots.contentId, ep.id))
-      .orderBy(desc(analyticsSnapshots.capturedAt))
-      .limit(2);
-    kpiViews = snaps[0]?.views ?? 0;
-    kpiPrevViews = snaps[1]?.views ?? 0;
-  }
-
-  // Platform performance aggregate
-  const platViews = await db
-    .select({
-      platformId: analyticsSnapshots.platformId,
-      views: sql<number>`SUM(${analyticsSnapshots.views})`.as("views"),
-    })
-    .from(analyticsSnapshots)
-    .groupBy(analyticsSnapshots.platformId)
-    .orderBy(desc(sql`SUM(${analyticsSnapshots.views})`))
-    .limit(4);
+  const kpiNumber = latestPublished[0]?.episodeNumber ?? null;
+  const kpiViews = kpiSnaps[0]?.views ?? 0;
+  const kpiPrevViews = kpiSnaps[1]?.views ?? 0;
 
   return (
     <div className="px-4 md:px-8 py-6 max-w-5xl mx-auto">

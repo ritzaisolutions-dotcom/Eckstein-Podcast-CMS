@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { inArray } from "drizzle-orm";
 import { getDb, contentPlatformLinks, platforms, analyticsSnapshots } from "@/lib/db";
 
+export const maxDuration = 60;
+
 // Called by Vercel Cron: schedule in vercel.json
 // Manually: GET /api/cron/refresh-analytics with X-Cron-Secret header
 export async function GET(req: NextRequest) {
@@ -83,10 +85,10 @@ export async function GET(req: NextRequest) {
         const linksWithId = links.filter(l => l.externalId);
         let totalUpdated = 0;
 
-        for (const link of linksWithId) {
-          try {
+        const igSettled = await Promise.allSettled(
+          linksWithId.map(async (link) => {
             const res = await fetch(`https://graph.facebook.com/v20.0/${link.externalId}?fields=like_count,comments_count,reach,impressions&access_token=${igToken}`);
-            if (!res.ok) { igErrors.push(`IG ${link.externalId}: ${res.status}`); continue; }
+            if (!res.ok) throw new Error(`IG ${link.externalId}: ${res.status}`);
             const data = await res.json() as { like_count?: number; comments_count?: number; reach?: number; impressions?: number };
             await db.insert(analyticsSnapshots).values({
               contentId: link.contentId,
@@ -96,10 +98,11 @@ export async function GET(req: NextRequest) {
               comments: data.comments_count ?? 0,
               source: "api",
             });
-            totalUpdated++;
-          } catch (e) {
-            igErrors.push(`IG ${link.externalId}: ${String(e)}`);
-          }
+          })
+        );
+        for (const r of igSettled) {
+          if (r.status === "fulfilled") totalUpdated++;
+          else igErrors.push(String(r.reason));
         }
         results.push({ platform: "instagram", updated: totalUpdated, errors: igErrors });
       }

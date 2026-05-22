@@ -55,12 +55,7 @@ export default async function MindDumpPage() {
             const reactions: Record<string, number> = (() => { try { return JSON.parse(thread.reactions ?? "{}"); } catch { return {}; } })();
             const s = STATUS_DISPLAY[thread.status] ?? STATUS_DISPLAY.idea;
             return (
-              <Link
-                key={thread.id}
-                href={`/mind-dump/${thread.id}`}
-                className="cms-card flex items-start gap-4 hover:border-gold transition-colors"
-                style={{ textDecoration: "none" }}
-              >
+              <div key={thread.id} className="cms-card flex items-start gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                     <span className="text-xs px-2 py-0.5 rounded" style={{ background: s.bg, color: s.color, fontFamily: "var(--font-cinzel)", fontSize: "0.58rem", letterSpacing: "0.06em" }}>
@@ -77,18 +72,27 @@ export default async function MindDumpPage() {
                       </span>
                     ))}
                   </div>
-                  <p className="font-medium" style={{ color: "var(--navy)", fontFamily: "var(--font-eb-garamond)" }}>
-                    {thread.title}
-                  </p>
+                  <Link href={`/mind-dump/${thread.id}`} style={{ textDecoration: "none" }}>
+                    <p className="font-medium hover:underline" style={{ color: "var(--navy)", fontFamily: "var(--font-eb-garamond)" }}>
+                      {thread.title}
+                    </p>
+                  </Link>
                   <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
                     {new Date(thread.createdAt).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" })}
                   </p>
                 </div>
-                <div className="flex gap-3 shrink-0">
+                <div className="flex items-center gap-3 shrink-0">
                   {reactions.fire > 0 && <span className="text-sm" style={{ color: "var(--text-muted)" }}>🔥 {reactions.fire}</span>}
                   {reactions.star > 0 && <span className="text-sm" style={{ color: "var(--text-muted)" }}>⭐ {reactions.star}</span>}
+                  <Link
+                    href={`/mind-dump/${thread.id}`}
+                    className="text-xs px-2.5 py-1 rounded border transition-colors"
+                    style={{ borderColor: "var(--border)", color: "var(--text-muted)", fontFamily: "var(--font-cinzel)", fontSize: "0.58rem", letterSpacing: "0.06em" }}
+                  >
+                    Bearbeiten
+                  </Link>
                 </div>
-              </Link>
+              </div>
             );
           })}
         </div>
