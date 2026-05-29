@@ -5,6 +5,7 @@ import { getDb } from "@/lib/db";
 import { episodePreps, prepSections } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import PrepSectionEditor from "./PrepSectionEditor";
+import PrepShareButton from "@/components/PrepShareButton";
 
 const STATUS_OPTIONS = [
   { value: "sammeln",         label: "Sammeln" },
@@ -42,6 +43,7 @@ export default async function PrepDetailPage({ params }: { params: Promise<{ id:
           )}
         </div>
         <div className="flex gap-2 items-center">
+          <PrepShareButton prepId={id} />
           {STATUS_OPTIONS.map(s => (
             <span key={s.value} className="text-xs px-2 py-0.5 rounded" style={{
               fontFamily: "var(--font-cinzel)",

@@ -7,11 +7,12 @@ import { contentPieces, analyticsSnapshots, contentPlatformLinks } from "@/lib/d
 import { eq, desc, inArray, sql, and } from "drizzle-orm";
 
 const LIFECYCLE_STAGES = [
-  { key: "idea",        label: "Idee" },
-  { key: "production",  label: "Produktion" },
-  { key: "editing",     label: "Schnitt" },
-  { key: "scheduled",   label: "Geplant" },
-  { key: "published",   label: "Live" },
+  { key: "draft",     label: "Draft" },
+  { key: "scripting", label: "Scripting" },
+  { key: "filming",   label: "Filming" },
+  { key: "editing",   label: "Editing" },
+  { key: "revision",  label: "Revision" },
+  { key: "live",      label: "Live" },
 ];
 
 export default async function EpisodesPage({
@@ -143,7 +144,7 @@ export default async function EpisodesPage({
                   </td>
                   <td><Badge status={ep.status as "draft" | "scheduled" | "published"} /></td>
                   <td>
-                    <LifecyclePill stage={ep.lifecycleStage ?? "idee"} />
+                    <LifecyclePill stage={ep.lifecycleStage ?? "draft"} />
                   </td>
                   <td style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
                     {ep.uploadDate ? new Date(ep.uploadDate).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "—"}
@@ -172,8 +173,8 @@ export default async function EpisodesPage({
 
 function LifecyclePill({ stage }: { stage: string }) {
   const found = LIFECYCLE_STAGES.find(s => s.key === stage);
-  const isLate = stage === "published";
-  const isActive = stage !== "idee" && stage !== "published";
+  const isLate = stage === "live";
+  const isActive = stage !== "draft" && stage !== "live";
   return (
     <span className="text-xs px-2 py-0.5 rounded-full" style={{
       fontFamily: "var(--font-cinzel)", fontSize: "0.58rem", letterSpacing: "0.06em",
@@ -200,7 +201,7 @@ function TimelineView({ episodes }: { episodes: { id: string; episodeNumber: num
 
       {/* Episode rows */}
       {episodes.map(ep => {
-        const currentIdx = LIFECYCLE_STAGES.findIndex(s => s.key === (ep.lifecycleStage ?? "idee"));
+        const currentIdx = LIFECYCLE_STAGES.findIndex(s => s.key === (ep.lifecycleStage ?? "draft"));
         return (
           <div key={ep.id} className="grid min-w-max border-b hover:bg-cream-mid/30 transition-colors" style={{ gridTemplateColumns: `180px repeat(${LIFECYCLE_STAGES.length}, 140px)`, borderColor: "var(--border)" }}>
             <div className="px-4 py-3 flex flex-col justify-center">
