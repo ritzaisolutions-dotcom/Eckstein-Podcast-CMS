@@ -10,6 +10,7 @@
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:push-indexes": "npx tsx scripts/push-indexes.ts",
+    "db:push-indexes-concurrent": "npx tsx scripts/push-index-concurrent.ts",
     "db:studio": "drizzle-kit studio",
     "db:seed-vault": "npx tsx scripts/seed-vault.ts"
   },
