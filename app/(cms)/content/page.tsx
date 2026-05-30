@@ -1,4 +1,5 @@
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { getCachedPlatforms, getCachedAnalyticsSnapshots, viewsByContentId } from "@/lib/cache";

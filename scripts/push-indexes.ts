@@ -25,7 +25,7 @@ if (existsSync(envPath)) {
 const INDEXES = [
   `CREATE INDEX IF NOT EXISTS analytics_snapshots_content_id_idx ON analytics_snapshots (content_id)`,
   `CREATE INDEX IF NOT EXISTS analytics_snapshots_platform_id_idx ON analytics_snapshots (platform_id)`,
-  `CREATE INDEX IF NOT EXISTS analytics_snapshots_content_platform_idx ON analytics_snapshots (content_id, platform_id)`,
+  `CREATE INDEX IF NOT EXISTS analytics_snapshots_latest_idx ON analytics_snapshots (content_id, platform_id, captured_at DESC)`,
   `CREATE INDEX IF NOT EXISTS content_pieces_type_status_idx ON content_pieces (type, status)`,
   `CREATE INDEX IF NOT EXISTS content_pieces_type_lifecycle_idx ON content_pieces (type, lifecycle_stage)`,
   `CREATE INDEX IF NOT EXISTS content_platform_links_scheduled_idx ON content_platform_links (scheduled_at)`,

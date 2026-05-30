@@ -1,6 +1,6 @@
 import { unstable_cache, revalidateTag } from "next/cache";
 import { getDb } from "./db";
-import { platforms, contentPieces, analyticsSnapshots, contentPlatformLinks } from "./db/schema";
+import { platforms, contentPieces, contentPlatformLinks } from "./db/schema";
 import { count, inArray, sql, eq } from "drizzle-orm";
 
 // Platform rows never change at runtime — cache for 1 hour
@@ -15,16 +15,49 @@ export const getCachedPlatforms = unstable_cache(
 
 type PlatformViewRow = { platformId: number; views: number };
 
-// Top platforms by latest snapshot views — avoids full-table SUM on append-only rows
+type SnapRow = {
+  contentId: string;
+  platformId: number;
+  views: number | null;
+  likes: number | null;
+  comments: number | null;
+};
+
+/** Latest snapshot per (content, platform) via DISTINCT ON — much faster than GROUP BY MAX on append-only table. */
+async function latestSnapshotsForIds(ids: string[] | null): Promise<SnapRow[]> {
+  const db = getDb();
+  if (ids !== null && ids.length === 0) return [];
+
+  const whereClause =
+    ids === null
+      ? sql``
+      : sql`WHERE content_id IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})`;
+
+  const result = await db.execute(sql`
+    SELECT DISTINCT ON (content_id, platform_id)
+      content_id AS "contentId",
+      platform_id AS "platformId",
+      views,
+      likes,
+      comments
+    FROM analytics_snapshots
+    ${whereClause}
+    ORDER BY content_id, platform_id, captured_at DESC
+  `);
+  return result as unknown as SnapRow[];
+}
+
+// Top platforms by latest snapshot views — cached 5 min
 export const getCachedPlatformViews = unstable_cache(
   async (): Promise<PlatformViewRow[]> => {
     const db = getDb();
     const result = await db.execute(sql`
-      SELECT platform_id AS "platformId", SUM(max_views)::int AS views
+      SELECT platform_id AS "platformId", SUM(views)::int AS views
       FROM (
-        SELECT content_id, platform_id, MAX(views) AS max_views
+        SELECT DISTINCT ON (content_id, platform_id)
+          platform_id, views
         FROM analytics_snapshots
-        GROUP BY content_id, platform_id
+        ORDER BY content_id, platform_id, captured_at DESC
       ) latest
       GROUP BY platform_id
       ORDER BY views DESC
@@ -36,24 +69,14 @@ export const getCachedPlatformViews = unstable_cache(
   { revalidate: 300, tags: ["analytics-snapshots"] }
 );
 
-// Analytics snapshot aggregates — snapshots are pulled daily, so 5min cache is fine.
-// Keyed by a sorted list of content IDs so different filter combinations get their own entry.
+// Analytics snapshot aggregates for specific content IDs — 5 min cache, keyed by sorted ID list
 export function getCachedAnalyticsSnapshots(ids: string[]) {
   const key = [...ids].sort().join(",");
   return unstable_cache(
     async () => {
       const db = getDb();
       const [snapRows, links] = await Promise.all([
-        db.select({
-            contentId: analyticsSnapshots.contentId,
-            platformId: analyticsSnapshots.platformId,
-            views: sql<number>`MAX(${analyticsSnapshots.views})`.as("views"),
-            likes: sql<number>`MAX(${analyticsSnapshots.likes})`.as("likes"),
-            comments: sql<number>`MAX(${analyticsSnapshots.comments})`.as("comments"),
-          })
-          .from(analyticsSnapshots)
-          .where(inArray(analyticsSnapshots.contentId, ids))
-          .groupBy(analyticsSnapshots.contentId, analyticsSnapshots.platformId),
+        latestSnapshotsForIds(ids),
         db.select().from(contentPlatformLinks).where(inArray(contentPlatformLinks.contentId, ids)),
       ]);
       return { snapRows, links };
@@ -63,7 +86,7 @@ export function getCachedAnalyticsSnapshots(ids: string[]) {
   )();
 }
 
-/** Sum MAX-per-platform views into a single number per content piece. */
+/** Sum latest-per-platform views into a single number per content piece. */
 export function viewsByContentId(
   snapRows: readonly { contentId: string; views: number | null }[],
 ): Record<string, number> {
@@ -91,28 +114,9 @@ export const getCachedContentCounts = unstable_cache(
   { revalidate: 60, tags: ["content-counts"] }
 );
 
-type SnapRow = {
-  contentId: string;
-  platformId: number;
-  views: number | null;
-  likes: number | null;
-  comments: number | null;
-};
-
-// Single global cache for all analytics aggregates — avoids per-page ID cache keys
+// Global latest snapshots — only for cron/admin; prefer getCachedAnalyticsSnapshots(ids)
 export const getCachedAllAnalyticsSnapshots = unstable_cache(
-  async (): Promise<SnapRow[]> => {
-    const db = getDb();
-    return db.select({
-        contentId: analyticsSnapshots.contentId,
-        platformId: analyticsSnapshots.platformId,
-        views: sql<number>`MAX(${analyticsSnapshots.views})`.as("views"),
-        likes: sql<number>`MAX(${analyticsSnapshots.likes})`.as("likes"),
-        comments: sql<number>`MAX(${analyticsSnapshots.comments})`.as("comments"),
-      })
-      .from(analyticsSnapshots)
-      .groupBy(analyticsSnapshots.contentId, analyticsSnapshots.platformId);
-  },
+  async (): Promise<SnapRow[]> => latestSnapshotsForIds(null),
   ["analytics-all"],
   { revalidate: 300, tags: ["analytics-snapshots"] }
 );

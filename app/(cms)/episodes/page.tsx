@@ -3,9 +3,9 @@ export const maxDuration = 30;
 import Link from "next/link";
 import Badge from "@/components/ui/Badge";
 import { getDb } from "@/lib/db";
-import { getCachedPlatforms, getCachedAllAnalyticsSnapshots, viewsByContentId } from "@/lib/cache";
-import { contentPieces, contentPlatformLinks } from "@/lib/db/schema";
-import { eq, desc, inArray, and, count } from "drizzle-orm";
+import { getCachedPlatforms, getCachedAnalyticsSnapshots, viewsByContentId } from "@/lib/cache";
+import { contentPieces } from "@/lib/db/schema";
+import { eq, desc, and, count } from "drizzle-orm";
 
 const PAGE_SIZE = 100;
 
@@ -51,16 +51,11 @@ export default async function EpisodesPage({
   const ids = episodes.map(e => e.id);
   const totalPages = Math.max(1, Math.ceil(Number(total) / PAGE_SIZE));
 
-  const [allSnapRows, links, platformRows] = await Promise.all([
-    getCachedAllAnalyticsSnapshots(),
-    ids.length > 0
-      ? db.select().from(contentPlatformLinks).where(inArray(contentPlatformLinks.contentId, ids))
-      : Promise.resolve([]),
+  const [{ snapRows, links }, platformRows] = await Promise.all([
+    ids.length > 0 ? getCachedAnalyticsSnapshots(ids) : Promise.resolve({ snapRows: [], links: [] }),
     getCachedPlatforms(),
   ]);
 
-  const idSet = new Set(ids);
-  const snapRows = allSnapRows.filter(r => idSet.has(r.contentId));
   const viewsMap = viewsByContentId(snapRows);
   const platMap = Object.fromEntries(platformRows.map(p => [p.id, p.slug]));
   const platByContent: Record<string, string[]> = {};

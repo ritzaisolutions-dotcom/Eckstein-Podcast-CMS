@@ -4,7 +4,7 @@ import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { getCachedPlatforms, getCachedContentCounts, getCachedPlatformViews } from "@/lib/cache";
 import { contentPieces, contentPlatformLinks, episodeTasks, forumThreads, analyticsSnapshots } from "@/lib/db/schema";
-import { eq, and, lte, isNull, isNotNull, count, desc, gte, inArray, or, sql } from "drizzle-orm";
+import { eq, and, lte, isNull, isNotNull, desc, gte, inArray, or } from "drizzle-orm";
 
 const WOCHENTAGE = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 const MONATE = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
@@ -40,94 +40,81 @@ export default async function Dashboard() {
   weekLater.setDate(today.getDate() + 7);
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
+  // Cached aggregates first (single heavy analytics query max)
   const [
     { total: totalCount, byType: countByType },
     platformRows,
-    dueTodayLinks,
-    dueWeekLinks,
-    recentEps,
-    newIdeas,
-    latestPublished,
-    recentIdeas,
     platViews,
   ] = await Promise.all([
     getCachedContentCounts(),
     getCachedPlatforms(),
-
-    // Heute fällig
-    db.select({
-        contentId: contentPlatformLinks.contentId,
-        platformId: contentPlatformLinks.platformId,
-        title: contentPieces.title,
-        episodeNumber: contentPieces.episodeNumber,
-        type: contentPieces.type,
-      })
-      .from(contentPlatformLinks)
-      .innerJoin(contentPieces, eq(contentPlatformLinks.contentId, contentPieces.id))
-      .where(and(
-        isNull(contentPlatformLinks.postedAt),
-        isNotNull(contentPlatformLinks.scheduledAt),
-        lte(contentPlatformLinks.scheduledAt, new Date(todayStr + "T23:59:59Z")),
-      ))
-      .limit(6),
-
-    // Diese Woche
-    db.select({
-        id: contentPieces.id,
-        title: contentPieces.title,
-        episodeNumber: contentPieces.episodeNumber,
-        filmingDate: contentPieces.filmingDate,
-        lifecycleStage: contentPieces.lifecycleStage,
-        scheduledAt: contentPlatformLinks.scheduledAt,
-      })
-      .from(contentPieces)
-      .leftJoin(contentPlatformLinks, eq(contentPlatformLinks.contentId, contentPieces.id))
-      .where(or(
-        and(
-          isNull(contentPlatformLinks.postedAt),
-          isNotNull(contentPlatformLinks.scheduledAt),
-          gte(contentPlatformLinks.scheduledAt, new Date(todayStr + "T00:00:00Z")),
-          lte(contentPlatformLinks.scheduledAt, weekLater),
-        ),
-        and(
-          eq(contentPieces.lifecycleStage, "filming"),
-          isNotNull(contentPieces.filmingDate),
-          gte(contentPieces.filmingDate, new Date(todayStr + "T00:00:00Z")),
-          lte(contentPieces.filmingDate, weekLater),
-        ),
-      ))
-      .limit(6),
-
-    // Recent LFCs for pipeline view
-    db.select()
-      .from(contentPieces)
-      .where(eq(contentPieces.type, "lfc"))
-      .orderBy(desc(contentPieces.createdAt))
-      .limit(5),
-
-    // Neue Ideen count
-    db.select({ cnt: count() })
-      .from(forumThreads)
-      .where(gte(forumThreads.createdAt, weekAgo)),
-
-    // Latest published for KPI
-    db.select()
-      .from(contentPieces)
-      .where(and(eq(contentPieces.type, "lfc"), eq(contentPieces.status, "published")))
-      .orderBy(desc(contentPieces.uploadDate))
-      .limit(1),
-
-    // Recent ideas for display
-    db.select({ id: forumThreads.id, title: forumThreads.title })
-      .from(forumThreads)
-      .orderBy(desc(forumThreads.createdAt))
-      .limit(4),
-
     getCachedPlatformViews(),
   ]);
 
   const platformMap = Object.fromEntries(platformRows.map(p => [p.id, p.slug]));
-  const newIdeasCount = Number(newIdeas[0]?.cnt ?? 0);
+
+  // Lightweight widget queries — sequential to avoid queueing 9 queries on max:1 connection
+  const dueTodayLinks = await db.select({
+      contentId: contentPlatformLinks.contentId,
+      platformId: contentPlatformLinks.platformId,
+      title: contentPieces.title,
+      episodeNumber: contentPieces.episodeNumber,
+      type: contentPieces.type,
+    })
+    .from(contentPlatformLinks)
+    .innerJoin(contentPieces, eq(contentPlatformLinks.contentId, contentPieces.id))
+    .where(and(
+      isNull(contentPlatformLinks.postedAt),
+      isNotNull(contentPlatformLinks.scheduledAt),
+      lte(contentPlatformLinks.scheduledAt, new Date(todayStr + "T23:59:59Z")),
+    ))
+    .limit(6);
+
+  const dueWeekLinks = await db.select({
+      id: contentPieces.id,
+      title: contentPieces.title,
+      episodeNumber: contentPieces.episodeNumber,
+      filmingDate: contentPieces.filmingDate,
+      lifecycleStage: contentPieces.lifecycleStage,
+      scheduledAt: contentPlatformLinks.scheduledAt,
+    })
+    .from(contentPieces)
+    .leftJoin(contentPlatformLinks, eq(contentPlatformLinks.contentId, contentPieces.id))
+    .where(or(
+      and(
+        isNull(contentPlatformLinks.postedAt),
+        isNotNull(contentPlatformLinks.scheduledAt),
+        gte(contentPlatformLinks.scheduledAt, new Date(todayStr + "T00:00:00Z")),
+        lte(contentPlatformLinks.scheduledAt, weekLater),
+      ),
+      and(
+        eq(contentPieces.lifecycleStage, "filming"),
+        isNotNull(contentPieces.filmingDate),
+        gte(contentPieces.filmingDate, new Date(todayStr + "T00:00:00Z")),
+        lte(contentPieces.filmingDate, weekLater),
+      ),
+    ))
+    .limit(6);
+
+  const recentEps = await db.select()
+    .from(contentPieces)
+    .where(eq(contentPieces.type, "lfc"))
+    .orderBy(desc(contentPieces.createdAt))
+    .limit(5);
+
+  const forumRecent = await db.select({ id: forumThreads.id, title: forumThreads.title, createdAt: forumThreads.createdAt })
+    .from(forumThreads)
+    .orderBy(desc(forumThreads.createdAt))
+    .limit(20);
+
+  const latestPublished = await db.select()
+    .from(contentPieces)
+    .where(and(eq(contentPieces.type, "lfc"), eq(contentPieces.status, "published")))
+    .orderBy(desc(contentPieces.uploadDate))
+    .limit(1);
+
+  const recentIdeas = forumRecent.slice(0, 4);
+  const newIdeasCount = forumRecent.filter(t => t.createdAt && t.createdAt >= weekAgo).length;
 
   // Episode tasks + KPI snaps fetched in parallel (second batch)
   const recentEpIds = recentEps.map(e => e.id);

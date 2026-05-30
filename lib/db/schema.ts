@@ -73,6 +73,7 @@ export const analyticsSnapshots = pgTable("analytics_snapshots", {
   contentIdx: index("analytics_snapshots_content_id_idx").on(t.contentId),
   platformIdx: index("analytics_snapshots_platform_id_idx").on(t.platformId),
   contentPlatformIdx: index("analytics_snapshots_content_platform_idx").on(t.contentId, t.platformId),
+  latestIdx: index("analytics_snapshots_latest_idx").on(t.contentId, t.platformId, t.capturedAt),
 }));
 
 // ─── Media Assets ─────────────────────────────────────────────────────────────

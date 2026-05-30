@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 import Link from "next/link";
 import { getDb } from "@/lib/db";
-import { getCachedPlatforms, getCachedAllAnalyticsSnapshots, getCachedAnalyticsSnapshots } from "@/lib/cache";
+import { getCachedPlatforms, getCachedAnalyticsSnapshots } from "@/lib/cache";
 import { contentPieces } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 
@@ -32,18 +32,14 @@ export default async function AnalyticsPage({
     .limit(100);
 
   const ids = pieces.map(p => p.id);
-  const idSet = new Set(ids);
   if (ids.length === 0) {
     return <EmptyState typeFilter={typeFilter} />;
   }
 
-  const [allSnapRows, platformRows, links] = await Promise.all([
-    getCachedAllAnalyticsSnapshots(),
+  const [{ snapRows, links }, platformRows] = await Promise.all([
+    getCachedAnalyticsSnapshots(ids),
     getCachedPlatforms(),
-    getCachedAnalyticsSnapshots(ids).then(r => r.links),
   ]);
-
-  const snapRows = allSnapRows.filter(r => idSet.has(r.contentId));
 
   // Aggregate per content
   const aggregated: Record<string, { views: number; likes: number; comments: number; byPlatform: Record<number, { views: number; likes: number }> }> = {};

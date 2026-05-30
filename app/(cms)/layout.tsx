@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
 import Sidebar from "@/components/Sidebar";
 import CommandPalette from "@/components/CommandPalette";
 
