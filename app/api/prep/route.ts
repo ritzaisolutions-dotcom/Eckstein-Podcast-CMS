@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { episodePreps, prepSections } from "@/lib/db/schema";
+import { requireSession } from "@/lib/require-session";
 
 const DEFAULT_SECTIONS = [
   { slug: "thema",      label: "Thema & Kernaussage",   orderIndex: 0 },
@@ -11,6 +12,9 @@ const DEFAULT_SECTIONS = [
 ];
 
 export async function POST(req: NextRequest) {
+  const authError = await requireSession(req);
+  if (authError) return authError;
+
   const body = await req.json();
   const { workingTitle, episodeNumber, templateSlug, plannedDate } = body;
   if (!workingTitle) return NextResponse.json({ error: "workingTitle required" }, { status: 400 });

@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { inArray } from "drizzle-orm";
+import { inArray, lt } from "drizzle-orm";
 import { getDb, contentPlatformLinks, platforms, analyticsSnapshots } from "@/lib/db";
+import { invalidateContentCaches } from "@/lib/cache";
 
 export const maxDuration = 60;
 
+const RETENTION_DAYS = 90;
+
 // Called by Vercel Cron: schedule in vercel.json
-// Manually: GET /api/cron/refresh-analytics with X-Cron-Secret header
 export async function GET(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret && req.headers.get("x-cron-secret") !== cronSecret) {
@@ -17,6 +19,12 @@ export async function GET(req: NextRequest) {
   const results: { platform: string; updated: number; errors: string[] }[] = [];
 
   const db = getDb();
+
+  const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
+  const prunedRows = await db.delete(analyticsSnapshots)
+    .where(lt(analyticsSnapshots.capturedAt, cutoff))
+    .returning({ id: analyticsSnapshots.id });
+  const pruned = prunedRows.length;
 
   // ── YouTube ────────────────────────────────────────────────────────────────
   if (youtubeKey) {
@@ -111,5 +119,6 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, pulledAt: new Date().toISOString(), results });
+  invalidateContentCaches();
+  return NextResponse.json({ ok: true, pulledAt: new Date().toISOString(), pruned, results });
 }

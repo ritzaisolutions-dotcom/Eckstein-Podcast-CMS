@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 import Link from "next/link";
 import { getDb } from "@/lib/db";
-import { getCachedPlatforms, getCachedContentCounts } from "@/lib/cache";
+import { getCachedPlatforms, getCachedContentCounts, getCachedPlatformViews } from "@/lib/cache";
 import { contentPieces, contentPlatformLinks, episodeTasks, forumThreads, analyticsSnapshots } from "@/lib/db/schema";
 import { eq, and, lte, isNull, isNotNull, count, desc, gte, inArray, or, sql } from "drizzle-orm";
 
@@ -123,15 +123,7 @@ export default async function Dashboard() {
       .orderBy(desc(forumThreads.createdAt))
       .limit(4),
 
-    // Platform performance aggregate
-    db.select({
-        platformId: analyticsSnapshots.platformId,
-        views: sql<number>`SUM(${analyticsSnapshots.views})`.as("views"),
-      })
-      .from(analyticsSnapshots)
-      .groupBy(analyticsSnapshots.platformId)
-      .orderBy(desc(sql`SUM(${analyticsSnapshots.views})`))
-      .limit(4),
+    getCachedPlatformViews(),
   ]);
 
   const platformMap = Object.fromEntries(platformRows.map(p => [p.id, p.slug]));

@@ -1,10 +1,13 @@
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 import Link from "next/link";
 import Badge from "@/components/ui/Badge";
 import { getDb } from "@/lib/db";
-import { getCachedPlatforms } from "@/lib/cache";
-import { contentPieces, analyticsSnapshots, contentPlatformLinks } from "@/lib/db/schema";
-import { eq, desc, inArray, sql, and } from "drizzle-orm";
+import { getCachedPlatforms, getCachedAllAnalyticsSnapshots, viewsByContentId } from "@/lib/cache";
+import { contentPieces, contentPlatformLinks } from "@/lib/db/schema";
+import { eq, desc, inArray, and, count } from "drizzle-orm";
+
+const PAGE_SIZE = 100;
 
 const LIFECYCLE_STAGES = [
   { key: "draft",     label: "Draft" },
@@ -18,40 +21,47 @@ const LIFECYCLE_STAGES = [
 export default async function EpisodesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; status?: string }>;
+  searchParams: Promise<{ view?: string; status?: string; page?: string }>;
 }) {
   const params = await searchParams;
   const view = params.view ?? "table";
   const statusFilter = params.status ?? "";
+  const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
+  const offset = (page - 1) * PAGE_SIZE;
 
   const db = getDb();
 
-  const conditions = statusFilter ? [eq(contentPieces.status, statusFilter)] : [];
-  const episodes = await db
-    .select()
-    .from(contentPieces)
-    .where(
-      and(eq(contentPieces.type, "lfc"), ...(conditions.length ? conditions : []))
-    )
-    .orderBy(desc(contentPieces.episodeNumber));
+  const whereClause = and(
+    eq(contentPieces.type, "lfc"),
+    ...(statusFilter ? [eq(contentPieces.status, statusFilter)] : []),
+  );
+
+  const [episodes, [{ total }]] = await Promise.all([
+    db.select()
+      .from(contentPieces)
+      .where(whereClause)
+      .orderBy(desc(contentPieces.episodeNumber))
+      .limit(PAGE_SIZE)
+      .offset(offset),
+    db.select({ total: count() })
+      .from(contentPieces)
+      .where(whereClause),
+  ]);
 
   const ids = episodes.map(e => e.id);
+  const totalPages = Math.max(1, Math.ceil(Number(total) / PAGE_SIZE));
 
-  // Views per episode
-  const snapRows = ids.length > 0
-    ? await db
-        .select({ contentId: analyticsSnapshots.contentId, views: sql<number>`SUM(${analyticsSnapshots.views})`.as("v") })
-        .from(analyticsSnapshots)
-        .where(inArray(analyticsSnapshots.contentId, ids))
-        .groupBy(analyticsSnapshots.contentId)
-    : [];
-  const viewsMap = Object.fromEntries(snapRows.map(r => [r.contentId, Number(r.views)]));
+  const [allSnapRows, links, platformRows] = await Promise.all([
+    getCachedAllAnalyticsSnapshots(),
+    ids.length > 0
+      ? db.select().from(contentPlatformLinks).where(inArray(contentPlatformLinks.contentId, ids))
+      : Promise.resolve([]),
+    getCachedPlatforms(),
+  ]);
 
-  // Platform links
-  const links = ids.length > 0
-    ? await db.select().from(contentPlatformLinks).where(inArray(contentPlatformLinks.contentId, ids))
-    : [];
-  const platformRows = await getCachedPlatforms();
+  const idSet = new Set(ids);
+  const snapRows = allSnapRows.filter(r => idSet.has(r.contentId));
+  const viewsMap = viewsByContentId(snapRows);
   const platMap = Object.fromEntries(platformRows.map(p => [p.id, p.slug]));
   const platByContent: Record<string, string[]> = {};
   for (const l of links) {
@@ -60,7 +70,12 @@ export default async function EpisodesPage({
   }
 
   function buildUrl(overrides: Record<string, string>) {
-    const p = new URLSearchParams({ view, ...(statusFilter && { status: statusFilter }), ...overrides });
+    const p = new URLSearchParams({
+      view,
+      page: String(page),
+      ...(statusFilter && { status: statusFilter }),
+      ...overrides,
+    });
     return `/episodes?${p.toString()}`;
   }
 
@@ -71,7 +86,7 @@ export default async function EpisodesPage({
         <div>
           <h1 className="text-2xl tracking-tight" style={{ fontFamily: "var(--font-cinzel)", color: "var(--navy)" }}>Episoden</h1>
           <p className="text-sm mt-0.5" style={{ fontFamily: "var(--font-eb-garamond)", color: "var(--text-muted)", fontStyle: "italic" }}>
-            Long-Form Content · {episodes.length} Episoden
+            Long-Form Content · {total} Episoden{totalPages > 1 ? ` · Seite ${page}/${totalPages}` : ""}
           </p>
         </div>
         <Link href="/episodes/new" className="text-xs px-4 py-2 rounded" style={{ background: "var(--navy)", color: "var(--cream)", fontFamily: "var(--font-cinzel)", letterSpacing: "0.08em" }}>
@@ -165,6 +180,21 @@ export default async function EpisodesPage({
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex justify-center gap-2 mt-4">
+          {page > 1 && (
+            <Link href={buildUrl({ page: String(page - 1) })} className="text-xs px-3 py-1.5 rounded border" style={{ borderColor: "var(--border)", fontFamily: "var(--font-cinzel)" }}>
+              ← Zurück
+            </Link>
+          )}
+          {page < totalPages && (
+            <Link href={buildUrl({ page: String(page + 1) })} className="text-xs px-3 py-1.5 rounded border" style={{ borderColor: "var(--border)", fontFamily: "var(--font-cinzel)" }}>
+              Weiter →
+            </Link>
+          )}
         </div>
       )}
     </div>

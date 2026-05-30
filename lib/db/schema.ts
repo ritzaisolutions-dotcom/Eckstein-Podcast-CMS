@@ -1,4 +1,4 @@
-import { pgTable, text, integer, boolean, bigserial, serial, timestamp, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, boolean, bigserial, serial, timestamp, primaryKey, index } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 // ─── Platforms (seeded, static) ──────────────────────────────────────────────
@@ -35,7 +35,10 @@ export const contentPieces = pgTable("content_pieces", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   uploadDate: timestamp("upload_date"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  typeStatusIdx: index("content_pieces_type_status_idx").on(t.type, t.status),
+  typeLifecycleIdx: index("content_pieces_type_lifecycle_idx").on(t.type, t.lifecycleStage),
+}));
 
 // ─── Content Platform Links ───────────────────────────────────────────────────
 
@@ -49,6 +52,8 @@ export const contentPlatformLinks = pgTable("content_platform_links", {
   externalId: text("external_id"),
 }, (t) => ({
   pk: primaryKey({ columns: [t.contentId, t.platformId] }),
+  scheduledIdx: index("content_platform_links_scheduled_idx").on(t.scheduledAt),
+  postedIdx: index("content_platform_links_posted_idx").on(t.postedAt),
 }));
 
 // ─── Analytics Snapshots (append-only) ───────────────────────────────────────
@@ -64,7 +69,11 @@ export const analyticsSnapshots = pgTable("analytics_snapshots", {
   shares: integer("shares").default(0),
   watchTimeSec: integer("watch_time_sec"),
   source: text("source").notNull().default("api"), // 'api' | 'manual'
-});
+}, (t) => ({
+  contentIdx: index("analytics_snapshots_content_id_idx").on(t.contentId),
+  platformIdx: index("analytics_snapshots_platform_id_idx").on(t.platformId),
+  contentPlatformIdx: index("analytics_snapshots_content_platform_idx").on(t.contentId, t.platformId),
+}));
 
 // ─── Media Assets ─────────────────────────────────────────────────────────────
 

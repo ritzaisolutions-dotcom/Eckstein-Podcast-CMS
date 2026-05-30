@@ -1,9 +1,9 @@
 export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { getDb } from "@/lib/db";
-import { getCachedPlatforms } from "@/lib/cache";
-import { contentPieces, contentPlatformLinks, analyticsSnapshots } from "@/lib/db/schema";
-import { eq, desc, asc, ilike, and, inArray, sql } from "drizzle-orm";
+import { getCachedPlatforms, getCachedAnalyticsSnapshots, viewsByContentId } from "@/lib/cache";
+import { contentPieces, contentPlatformLinks } from "@/lib/db/schema";
+import { eq, desc, asc, ilike, and, inArray } from "drizzle-orm";
 import Badge from "@/components/ui/Badge";
 import TypeSelect from "./TypeSelect";
 
@@ -56,20 +56,11 @@ export default async function ContentPage({
   const ids         = pieces.map(p => p.id);
   const platformMap = Object.fromEntries(platformRows.map(p => [p.id, p.slug]));
 
-  const [links, snapshots] = ids.length > 0
-    ? await Promise.all([
-        db.select().from(contentPlatformLinks).where(inArray(contentPlatformLinks.contentId, ids)),
-        db.select({
-            contentId: analyticsSnapshots.contentId,
-            views: sql<number>`SUM(${analyticsSnapshots.views})`.as("views"),
-          })
-          .from(analyticsSnapshots)
-          .where(inArray(analyticsSnapshots.contentId, ids))
-          .groupBy(analyticsSnapshots.contentId),
-      ])
-    : [[], []];
+  const [links, snapRows] = ids.length > 0
+    ? await getCachedAnalyticsSnapshots(ids).then(({ snapRows, links }) => [links, snapRows] as const)
+    : [[], []] as const;
 
-  const viewsMap: Record<string, number> = Object.fromEntries(snapshots.map(s => [s.contentId, Number(s.views)]));
+  const viewsMap = viewsByContentId(snapRows);
 
   const platformByContentId: Record<string, string[]> = {};
   for (const link of links) {

@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
-import { contentPieces, contentPlatformLinks, platforms } from "@/lib/db/schema";
+import { contentPieces, contentPlatformLinks } from "@/lib/db/schema";
 import { eq, count, and, ilike, desc } from "drizzle-orm";
+import { getCachedPlatforms, invalidateContentCaches } from "@/lib/cache";
+import { requireSession } from "@/lib/require-session";
 
 export async function GET(req: NextRequest) {
+  const authError = await requireSession(req);
+  if (authError) return authError;
+
   const { searchParams } = new URL(req.url);
   const type = searchParams.get("type") ?? "lfc";
   const q = searchParams.get("q") ?? "";
@@ -28,6 +33,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const authError = await requireSession(req);
+  if (authError) return authError;
+
   const body = await req.json();
   const {
     type, title, bio, bodyMd, episodeNumber,
@@ -43,7 +51,6 @@ export async function POST(req: NextRequest) {
   const db = getDb();
   const id = crypto.randomUUID();
 
-  // Calculate next typeIndex for this content type
   const [{ cnt }] = await db
     .select({ cnt: count() })
     .from(contentPieces)
@@ -65,9 +72,8 @@ export async function POST(req: NextRequest) {
     parentId: parentId || null,
   });
 
-  // Insert platform links if any
   if (platformLinks.length > 0) {
-    const platformRows = await db.select().from(platforms);
+    const platformRows = await getCachedPlatforms();
     const slugToId = Object.fromEntries(platformRows.map(p => [p.slug, p.id]));
 
     const linksToInsert = platformLinks
@@ -85,5 +91,6 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  invalidateContentCaches();
   return NextResponse.json({ id });
 }

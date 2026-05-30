@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { episodePreps, prepShareLinks } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
+import { requireSession } from "@/lib/require-session";
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const authError = await requireSession(req);
+  if (authError) return authError;
   const { id } = await params;
   const db = getDb();
 
@@ -25,6 +28,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const authError = await requireSession(req);
+  if (authError) return authError;
+
   const { id } = await params;
   const db = getDb();
 

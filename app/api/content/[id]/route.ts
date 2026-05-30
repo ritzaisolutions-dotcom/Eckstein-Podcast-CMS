@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import {
-  contentPieces, contentPlatformLinks, platforms,
+  contentPieces, contentPlatformLinks,
   analyticsSnapshots, mediaAssetLinks, contentTags,
   episodeTasks, clipQueue, episodePreps,
 } from "@/lib/db/schema";
 import { eq, or } from "drizzle-orm";
+import { getCachedPlatforms, invalidateContentCaches } from "@/lib/cache";
+import { requireSession } from "@/lib/require-session";
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const authError = await requireSession(req);
+  if (authError) return authError;
+
   const { id } = await params;
   const db = getDb();
 
@@ -15,7 +20,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (!piece) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const links = await db.select().from(contentPlatformLinks).where(eq(contentPlatformLinks.contentId, id));
-  const platformRows = await db.select().from(platforms);
+  const platformRows = await getCachedPlatforms();
   const idToSlug = Object.fromEntries(platformRows.map(p => [p.id, p.slug]));
 
   const platformLinks = links.map(l => ({
@@ -29,6 +34,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const authError = await requireSession(req);
+  if (authError) return authError;
+
   const { id } = await params;
   const body = await req.json();
   const {
@@ -56,11 +64,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     })
     .where(eq(contentPieces.id, id));
 
-  // Replace all platform links
   await db.delete(contentPlatformLinks).where(eq(contentPlatformLinks.contentId, id));
 
   if (platformLinks.length > 0) {
-    const platformRows = await db.select().from(platforms);
+    const platformRows = await getCachedPlatforms();
     const slugToId = Object.fromEntries(platformRows.map(p => [p.slug, p.id]));
 
     const linksToInsert = platformLinks
@@ -78,26 +85,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
   }
 
-
-
+  invalidateContentCaches();
   return NextResponse.json({ id });
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const authError = await requireSession(req);
+  if (authError) return authError;
+
   const { id } = await params;
   const db = getDb();
 
-  // Clear parent references on child SFCs before deleting
   await db.update(contentPieces)
     .set({ parentId: null })
     .where(eq(contentPieces.parentId, id));
 
-  // Clear linkedContentId on prep docs
   await db.update(episodePreps)
     .set({ linkedContentId: null })
     .where(eq(episodePreps.linkedContentId, id));
 
-  // Delete all rows that directly reference this content piece
   await Promise.all([
     db.delete(contentPlatformLinks).where(eq(contentPlatformLinks.contentId, id)),
     db.delete(analyticsSnapshots).where(eq(analyticsSnapshots.contentId, id)),
@@ -111,5 +117,6 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
 
   await db.delete(contentPieces).where(eq(contentPieces.id, id));
 
+  invalidateContentCaches();
   return NextResponse.json({ ok: true });
 }
