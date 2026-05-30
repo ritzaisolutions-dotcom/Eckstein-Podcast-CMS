@@ -9,6 +9,7 @@
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
+    "db:push-indexes": "npx tsx scripts/push-indexes.ts",
     "db:studio": "drizzle-kit studio",
     "db:seed-vault": "npx tsx scripts/seed-vault.ts"
   },
