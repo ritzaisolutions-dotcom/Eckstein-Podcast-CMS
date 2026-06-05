@@ -13,6 +13,9 @@ import {
   buildContentHubUrl,
   buildHubPiece,
   buildLinksBySlug,
+  buildContentDetailUrl,
+  buildContentNewUrl,
+  EMPTY_CTA_LABELS,
   defaultViewFromParam,
   type SortDir,
   type SortField,
@@ -141,6 +144,8 @@ export default async function ContentPage({
   }
 
   const showBoard = view === "board";
+  const hubReturnTo = buildContentHubUrl(filterBase);
+  const emptyCta = EMPTY_CTA_LABELS[typeFilter] ?? EMPTY_CTA_LABELS[""];
 
   return (
     <div className="px-4 md:px-8 py-6 max-w-[1400px] mx-auto">
@@ -166,17 +171,17 @@ export default async function ContentPage({
               : "Noch kein Content angelegt."}
           </p>
           <Link
-            href={typeFilter ? `/content/new?type=${typeFilter}` : "/content/new"}
+            href={buildContentNewUrl(filterBase, typeFilter || undefined)}
             className="inline-block mt-4 text-xs px-4 py-2 rounded cms-glass-strong"
             style={{ color: "var(--cream)", fontFamily: "var(--font-cinzel)" }}
           >
-            Erste Episode anlegen
+            {emptyCta}
           </Link>
         </div>
       ) : (
         <>
           <div className={showBoard ? "hidden md:block mb-6" : "hidden"}>
-            <ContentBoard pieces={hubPieces} />
+            <ContentBoard pieces={hubPieces} returnTo={hubReturnTo} />
           </div>
           <div className={showBoard ? "md:hidden" : "block"}>
             <ContentTable
@@ -185,6 +190,7 @@ export default async function ContentPage({
               dir={dir}
               typeFilter={typeFilter}
               buildUrl={buildUrl}
+              returnTo={hubReturnTo}
             />
           </div>
         </>

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Badge from "@/components/ui/Badge";
 import { PLATFORM_CHIP_STYLES, platformChipLabel } from "@/lib/platforms";
-import type { HubPiece, SortDir, SortField } from "@/lib/content-hub";
+import { buildContentDetailUrl, TYPE_LABELS, type HubPiece, type SortDir, type SortField } from "@/lib/content-hub";
 import { lifecycleLabel } from "@/lib/lifecycle";
 
 interface ContentTableProps {
@@ -10,6 +10,7 @@ interface ContentTableProps {
   dir: SortDir;
   typeFilter: string;
   buildUrl: (overrides: Record<string, string>) => string;
+  returnTo?: string;
 }
 
 function SortTh({
@@ -56,7 +57,7 @@ function PlatformTag({ slug }: { slug: string }) {
   );
 }
 
-export default function ContentTable({ pieces, sort, dir, typeFilter, buildUrl }: ContentTableProps) {
+export default function ContentTable({ pieces, sort, dir, typeFilter, buildUrl, returnTo }: ContentTableProps) {
   return (
     <div className="cms-card overflow-x-auto p-0">
       <table className="cms-table w-full">
@@ -91,7 +92,7 @@ export default function ContentTable({ pieces, sort, dir, typeFilter, buildUrl }
                 )}
               </td>
               <td>
-                <Link href={`/content/${piece.id}`} className="hover:underline block" style={{ color: "var(--text-primary)", fontFamily: "var(--font-eb-garamond)" }}>
+                <Link href={buildContentDetailUrl(piece.id, returnTo)} className="hover:underline block" style={{ color: "var(--text-primary)", fontFamily: "var(--font-eb-garamond)" }}>
                   {piece.episodeNumber ? <span className="text-xs mr-1.5" style={{ color: "var(--text-muted)" }}>EP.{piece.episodeNumber}</span> : null}
                   {piece.title}
                 </Link>
@@ -122,7 +123,7 @@ export default function ContentTable({ pieces, sort, dir, typeFilter, buildUrl }
                     textDecoration: "none",
                   }}
                 >
-                  {piece.type.toUpperCase()}
+                  {TYPE_LABELS[piece.type] ?? piece.type.toUpperCase()}
                 </Link>
               </td>
               <td><Badge status={piece.status as "draft" | "scheduled" | "published"} /></td>

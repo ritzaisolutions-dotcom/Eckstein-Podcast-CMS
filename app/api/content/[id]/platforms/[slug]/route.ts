@@ -52,8 +52,12 @@ export async function PATCH(
     .limit(1);
 
   const url = body.url !== undefined ? (body.url?.trim() || null) : existing?.url ?? null;
-  const scheduledAt = parseOptionalDate(body.scheduledAt) ?? existing?.scheduledAt ?? null;
-  const postedAt = parsePostedAt(body.postedAt) ?? existing?.postedAt ?? null;
+  const scheduledAt = body.scheduledAt !== undefined
+    ? parseOptionalDate(body.scheduledAt) ?? null
+    : existing?.scheduledAt ?? null;
+  const postedAt = body.postedAt !== undefined
+    ? parsePostedAt(body.postedAt) ?? null
+    : existing?.postedAt ?? null;
   const externalId = body.externalId !== undefined ? (body.externalId?.trim() || null) : existing?.externalId ?? null;
 
   if (existing) {

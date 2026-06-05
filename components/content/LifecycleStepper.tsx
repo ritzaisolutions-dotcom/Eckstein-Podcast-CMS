@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { LIFECYCLE_OPTIONS, type LifecycleStage } from "@/lib/lifecycle";
 
@@ -15,6 +15,10 @@ export default function LifecycleStepper({ contentId, initialStage, onStageChang
   const [stage, setStage] = useState(initialStage);
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    setStage(initialStage);
+  }, [contentId, initialStage]);
 
   async function selectStage(next: LifecycleStage) {
     if (next === stage || pending) return;

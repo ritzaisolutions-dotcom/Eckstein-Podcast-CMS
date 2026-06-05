@@ -6,11 +6,20 @@ import { getDb } from "@/lib/db";
 import { contentPieces, contentPlatformLinks } from "@/lib/db/schema";
 import { getCachedPlatforms } from "@/lib/cache";
 import { getPlatformsForType } from "@/lib/platforms";
+import { toDatetimeLocalValue } from "@/lib/datetime-local";
 import ContentEditPanel from "@/components/content/ContentEditPanel";
 import DeleteContentButton from "@/components/DeleteContentButton";
 
-export default async function ContentDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ContentDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ returnTo?: string }>;
+}) {
   const { id } = await params;
+  const { returnTo } = await searchParams;
+  const hubBackHref = returnTo?.startsWith("/content") ? returnTo : "/content";
   const db = getDb();
 
   const [piece] = await db.select().from(contentPieces).where(eq(contentPieces.id, id)).limit(1);
@@ -26,7 +35,7 @@ export default async function ContentDetailPage({ params }: { params: Promise<{ 
     if (!slug) continue;
     linksBySlug[slug] = {
       url: link.url ?? "",
-      scheduledAt: link.scheduledAt ? link.scheduledAt.toISOString().slice(0, 16) : "",
+      scheduledAt: toDatetimeLocalValue(link.scheduledAt),
       postedAt: link.postedAt ? link.postedAt.toISOString() : null,
     };
   }
@@ -44,6 +53,7 @@ export default async function ContentDetailPage({ params }: { params: Promise<{ 
         <DeleteContentButton id={id} title={piece.title} />
       </div>
       <ContentEditPanel
+        hubBackHref={hubBackHref}
         data={{
           id: piece.id,
           type: piece.type,

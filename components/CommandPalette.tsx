@@ -89,32 +89,30 @@ export default function CommandPalette() {
   return (
     <div
       className="fixed inset-0 z-[9999] flex items-start justify-center pt-[15vh]"
-      style={{ background: "rgba(5,16,31,0.45)", backdropFilter: "blur(2px)" }}
+      style={{ background: "rgba(5,16,31,0.55)", backdropFilter: "blur(4px)" }}
       onClick={e => { if (e.target === e.currentTarget) close(); }}
     >
       <div
-        className="w-full max-w-lg rounded shadow-2xl overflow-hidden"
-        style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+        className="w-full max-w-lg rounded shadow-2xl overflow-hidden cms-glass-strong"
+        style={{ border: "1px solid var(--glass-border-subtle)" }}
         onKeyDown={onKeyDown}
       >
-        {/* Input */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b" style={{ borderColor: "var(--border)" }}>
-          <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>⌘</span>
+        <div className="flex items-center gap-3 px-4 py-3 border-b" style={{ borderColor: "var(--glass-border-subtle)" }}>
+          <span style={{ color: "var(--text-on-glass-muted)", fontSize: "0.8rem" }}>⌘</span>
           <input
             ref={inputRef}
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="Was möchtest du tun?"
             className="flex-1 bg-transparent outline-none text-sm"
-            style={{ fontFamily: "var(--font-eb-garamond)", color: "var(--text-primary)" }}
+            style={{ fontFamily: "var(--font-eb-garamond)", color: "var(--cream)" }}
           />
-          <kbd className="text-xs px-1.5 py-0.5 rounded" style={{ background: "var(--cream-mid)", color: "var(--text-muted)", fontFamily: "var(--font-cinzel)", fontSize: "0.55rem" }}>ESC</kbd>
+          <kbd className="text-xs px-1.5 py-0.5 rounded" style={{ background: "rgba(245,238,216,0.08)", color: "var(--text-on-glass-muted)", fontFamily: "var(--font-cinzel)", fontSize: "0.55rem" }}>ESC</kbd>
         </div>
 
-        {/* Results */}
         <ul className="max-h-72 overflow-y-auto py-1">
           {filtered.length === 0 ? (
-            <li className="px-4 py-6 text-center text-sm" style={{ color: "var(--text-muted)", fontStyle: "italic" }}>Keine Aktion gefunden</li>
+            <li className="px-4 py-6 text-center text-sm" style={{ color: "var(--text-on-glass-muted)", fontStyle: "italic" }}>Keine Aktion gefunden</li>
           ) : (
             filtered.map((cmd, i) => (
               <li key={cmd.href}>
@@ -124,15 +122,15 @@ export default function CommandPalette() {
                   onMouseEnter={() => setSelected(i)}
                   onClick={() => navigate(cmd.href)}
                 >
-                  <span style={{ color: i === selected ? "var(--gold)" : "rgba(12,30,53,0.35)", fontSize: "0.8rem", width: 16 }}>{cmd.icon}</span>
+                  <span style={{ color: i === selected ? "var(--gold-light)" : "var(--text-on-glass-muted)", fontSize: "0.8rem", width: 16 }}>{cmd.icon}</span>
                   <div className="flex-1 min-w-0">
-                    <span className="text-sm" style={{ fontFamily: "var(--font-eb-garamond)", color: "var(--text-primary)" }}>{cmd.label}</span>
+                    <span className="text-sm" style={{ fontFamily: "var(--font-eb-garamond)", color: "var(--cream)" }}>{cmd.label}</span>
                     {cmd.description && (
-                      <span className="ml-2 text-xs" style={{ color: "var(--text-muted)" }}>{cmd.description}</span>
+                      <span className="ml-2 text-xs" style={{ color: "var(--text-on-glass-muted)" }}>{cmd.description}</span>
                     )}
                   </div>
                   {i === selected && (
-                    <kbd className="text-xs px-1.5 py-0.5 rounded shrink-0" style={{ background: "var(--cream-mid)", color: "var(--text-muted)", fontFamily: "var(--font-cinzel)", fontSize: "0.5rem" }}>↵</kbd>
+                    <kbd className="text-xs px-1.5 py-0.5 rounded shrink-0" style={{ background: "rgba(245,238,216,0.08)", color: "var(--text-on-glass-muted)", fontFamily: "var(--font-cinzel)", fontSize: "0.5rem" }}>↵</kbd>
                   )}
                 </button>
               </li>
@@ -140,12 +138,11 @@ export default function CommandPalette() {
           )}
         </ul>
 
-        {/* Footer hint */}
-        <div className="px-4 py-2 border-t flex gap-4" style={{ borderColor: "var(--border)", background: "var(--cream-mid)" }}>
+        <div className="px-4 py-2 border-t flex gap-4" style={{ borderColor: "var(--glass-border-subtle)", background: "rgba(245,238,216,0.04)" }}>
           {[["↑↓", "navigieren"], ["↵", "öffnen"], ["esc", "schließen"]].map(([key, desc]) => (
             <span key={key} className="flex items-center gap-1">
-              <kbd className="text-xs px-1 py-0.5 rounded" style={{ background: "var(--bg-surface)", color: "var(--text-muted)", fontFamily: "var(--font-cinzel)", fontSize: "0.5rem" }}>{key}</kbd>
-              <span className="text-xs" style={{ color: "var(--text-muted)", fontFamily: "var(--font-eb-garamond)" }}>{desc}</span>
+              <kbd className="text-xs px-1 py-0.5 rounded" style={{ background: "rgba(245,238,216,0.08)", color: "var(--text-on-glass-muted)", fontFamily: "var(--font-cinzel)", fontSize: "0.5rem" }}>{key}</kbd>
+              <span className="text-xs" style={{ color: "var(--text-on-glass-muted)", fontFamily: "var(--font-eb-garamond)" }}>{desc}</span>
             </span>
           ))}
         </div>

@@ -10,6 +10,7 @@ import {
   supportsAnalyticsExternalId,
 } from "@/lib/platforms";
 import { LIFECYCLE_OPTIONS } from "@/lib/lifecycle";
+import { toDatetimeLocalValue } from "@/lib/datetime-local";
 
 interface ParentLfc {
   id: string;
@@ -30,15 +31,11 @@ interface PlatformLink {
   url: string;
   externalId: string;
   scheduledAt: string;
+  postedAt: string | null;
 }
 
 interface EpisodeFormProps {
   episodeId?: string;
-}
-
-function toDatetimeLocal(iso?: string | null): string {
-  if (!iso) return "";
-  return new Date(iso).toISOString().slice(0, 16);
 }
 
 export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
@@ -53,6 +50,7 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
   const [bio, setBio] = useState("");
   const [bodyMd, setBodyMd] = useState("");
   const [uploadDate, setUploadDate] = useState("");
+  const [filmingDate, setFilmingDate] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(!!episodeId);
@@ -75,14 +73,22 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
         setEpisodeNumber(data.episodeNumber ? String(data.episodeNumber) : "");
         setBio(data.bio ?? "");
         setBodyMd(data.bodyMd ?? "");
-        setUploadDate(toDatetimeLocal(data.uploadDate));
-
+        setUploadDate(toDatetimeLocalValue(data.uploadDate));
+        setFilmingDate(toDatetimeLocalValue(data.filmingDate));
 
         if (data.platformLinks?.length > 0) {
           const slugs = new Set<string>(data.platformLinks.map((l: PlatformLink) => l.slug));
           setSelectedPlatforms(slugs);
           const linksMap: Record<string, PlatformLink> = {};
-          for (const l of data.platformLinks) linksMap[l.slug] = l;
+          for (const l of data.platformLinks) {
+            linksMap[l.slug] = {
+              slug: l.slug,
+              url: l.url ?? "",
+              externalId: l.externalId ?? "",
+              scheduledAt: l.scheduledAt ?? "",
+              postedAt: l.postedAt ?? null,
+            };
+          }
           setPlatformLinks(linksMap);
         }
 
@@ -110,7 +116,7 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
       } else {
         next.add(slug);
         if (!platformLinks[slug]) {
-          setPlatformLinks(pl => ({ ...pl, [slug]: { slug, url: "", externalId: "", scheduledAt: "" } }));
+          setPlatformLinks(pl => ({ ...pl, [slug]: { slug, url: "", externalId: "", scheduledAt: "", postedAt: null } }));
         }
       }
       return next;
@@ -141,7 +147,16 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
     const allowed = new Set(getPlatformsForType(contentType).map(p => p.slug));
     const links = Array.from(selectedPlatforms)
       .filter(slug => allowed.has(slug))
-      .map(slug => platformLinks[slug] ?? { slug, url: "", externalId: "", scheduledAt: "" });
+      .map(slug => {
+        const link = platformLinks[slug] ?? { slug, url: "", externalId: "", scheduledAt: "", postedAt: null };
+        return {
+          slug,
+          url: link.url,
+          externalId: link.externalId,
+          scheduledAt: link.scheduledAt,
+          postedAt: link.postedAt,
+        };
+      });
 
     const payload = {
       type: contentType,
@@ -151,7 +166,7 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
       episodeNumber: episodeNumber || null,
       lifecycleStage,
       uploadDate: uploadDate || null,
-      filmingDate: null,
+      filmingDate: filmingDate || null,
       parentId: contentType === "sfc" ? (parentLfc?.id ?? null) : null,
       platformLinks: links,
     };
@@ -222,9 +237,9 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
                   onClick={() => setLifecycleStage(o.value)}
                   className="text-xs px-3 py-1.5 rounded border transition-colors"
                   style={{
-                    borderColor: lifecycleStage === o.value ? "var(--navy)" : "var(--border)",
-                    background: lifecycleStage === o.value ? "var(--navy)" : "transparent",
-                    color: lifecycleStage === o.value ? "var(--cream)" : "var(--text-secondary)",
+                    borderColor: lifecycleStage === o.value ? "var(--gold)" : "var(--glass-border-subtle)",
+                    background: lifecycleStage === o.value ? "rgba(201,168,76,0.18)" : "transparent",
+                    color: lifecycleStage === o.value ? "var(--cream)" : "var(--text-on-glass-muted)",
                     fontFamily: "var(--font-cinzel)",
                     fontSize: "0.6rem",
                     letterSpacing: "0.08em",
@@ -353,9 +368,19 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
 
       {/* Datum */}
       <div className="cms-card flex flex-col gap-4">
-        <h2 className="cms-card-title">Veröffentlichung</h2>
+        <h2 className="cms-card-title">Termine</h2>
         <div>
-          <label className="cms-label">Datum & Uhrzeit</label>
+          <label className="cms-label">Drehtermin</label>
+          <input
+            type="datetime-local"
+            value={filmingDate}
+            onChange={e => setFilmingDate(e.target.value)}
+            className="cms-input"
+            step="60"
+          />
+        </div>
+        <div>
+          <label className="cms-label">Veröffentlichung</label>
           <input
             type="datetime-local"
             value={uploadDate}
@@ -412,7 +437,7 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
                 {availablePlatforms
                   .filter(p => selectedPlatforms.has(p.slug))
                   .map(p => {
-                    const link = platformLinks[p.slug] ?? { url: "", externalId: "", scheduledAt: "" };
+                    const link = platformLinks[p.slug] ?? { url: "", externalId: "", scheduledAt: "", postedAt: null };
                     return (
                       <div key={p.slug}>
                         <div className="flex items-center gap-2 mb-2">

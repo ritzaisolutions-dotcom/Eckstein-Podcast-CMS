@@ -87,7 +87,7 @@ export default async function AnalyticsPage({
     <div className="px-4 md:px-8 py-6 max-w-6xl mx-auto">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl tracking-tight" style={{ fontFamily: "var(--font-cinzel)", color: "var(--navy)" }}>Analytics</h1>
+        <h1 className="text-2xl tracking-tight" style={{ fontFamily: "var(--font-cinzel)", color: "var(--cream)" }}>Analytics</h1>
         <p className="text-sm mt-0.5" style={{ fontFamily: "var(--font-eb-garamond)", color: "var(--text-muted)", fontStyle: "italic" }}>
           Aggregiert über alle Plattformen · Auto-Pull alle 24h
         </p>
@@ -101,9 +101,9 @@ export default async function AnalyticsPage({
             href={buildUrl({ type: pill.value })}
             className="text-xs px-4 py-1.5 rounded-full border transition-colors"
             style={{
-              borderColor: typeFilter === pill.value ? "var(--navy)" : "var(--border)",
-              background: typeFilter === pill.value ? "var(--navy)" : "transparent",
-              color: typeFilter === pill.value ? "var(--cream)" : "var(--text-secondary)",
+              borderColor: typeFilter === pill.value ? "var(--gold)" : "var(--glass-border-subtle)",
+              background: typeFilter === pill.value ? "rgba(201,168,76,0.2)" : "transparent",
+              color: typeFilter === pill.value ? "var(--cream)" : "var(--text-on-glass-muted)",
               fontFamily: "var(--font-cinzel)",
               letterSpacing: "0.08em",
             }}
@@ -141,7 +141,7 @@ export default async function AnalyticsPage({
           { label: "Total Comments", value: fmt(totalComments) },
         ].map(card => (
           <div key={card.label} className="cms-card text-center py-4">
-            <p className="text-2xl" style={{ fontFamily: "var(--font-cinzel)", color: "var(--navy)" }}>{card.value}</p>
+            <p className="text-2xl" style={{ fontFamily: "var(--font-cinzel)", color: "var(--gold-light)" }}>{card.value}</p>
             <p className="text-xs mt-1 uppercase tracking-widest" style={{ fontFamily: "var(--font-cinzel)", color: "var(--text-muted)" }}>{card.label}</p>
           </div>
         ))}
@@ -173,20 +173,20 @@ export default async function AnalyticsPage({
                     </Link>
                   </td>
                   <td>
-                    <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "var(--cream-mid)", color: "var(--text-secondary)", fontFamily: "var(--font-cinzel)", fontSize: "0.58rem" }}>
+                    <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "rgba(245,238,216,0.08)", color: "var(--text-on-glass-muted)", fontFamily: "var(--font-cinzel)", fontSize: "0.58rem" }}>
                       {piece.type.toUpperCase()}
                     </span>
                   </td>
                   <td>
                     <div className="flex flex-wrap gap-1">
                       {platIds.map(id => (
-                        <span key={id} className="text-xs px-1.5 py-0.5 rounded" style={{ background: "var(--cream-mid)", color: "var(--text-secondary)", fontFamily: "var(--font-cinzel)", fontSize: "0.55rem" }}>
+                        <span key={id} className="text-xs px-1.5 py-0.5 rounded" style={{ background: "rgba(245,238,216,0.08)", color: "var(--text-on-glass-muted)", fontFamily: "var(--font-cinzel)", fontSize: "0.55rem" }}>
                           {(platformMap[id] ?? "?").replace("_", " ").toUpperCase()}
                         </span>
                       ))}
                     </div>
                   </td>
-                  <td className="text-right" style={{ fontFamily: "var(--font-cinzel)", color: agg?.views ? "var(--navy)" : "var(--text-muted)" }}>
+                  <td className="text-right" style={{ fontFamily: "var(--font-cinzel)", color: agg?.views ? "var(--gold-light)" : "var(--text-muted)" }}>
                     {agg?.views ? fmt(agg.views) : "—"}
                   </td>
                   <td className="text-right" style={{ color: "var(--text-muted)" }}>
@@ -199,10 +199,10 @@ export default async function AnalyticsPage({
               );
             })}
             {/* Totals row */}
-            <tr style={{ borderTop: "2px solid var(--border)", background: "var(--cream-mid)" }}>
-              <td className="pl-4 py-2" style={{ fontFamily: "var(--font-cinzel)", fontSize: "0.7rem", color: "var(--text-muted)", letterSpacing: "0.1em" }}>GESAMT</td>
+            <tr style={{ borderTop: "2px solid var(--glass-border-subtle)", background: "rgba(245,238,216,0.04)" }}>
+              <td className="pl-4 py-2" style={{ fontFamily: "var(--font-cinzel)", fontSize: "0.7rem", color: "var(--text-on-glass-muted)", letterSpacing: "0.1em" }}>GESAMT</td>
               <td /><td />
-              <td className="text-right font-semibold" style={{ fontFamily: "var(--font-cinzel)", color: "var(--navy)" }}>{fmt(totalViews)}</td>
+              <td className="text-right font-semibold" style={{ fontFamily: "var(--font-cinzel)", color: "var(--gold-light)" }}>{fmt(totalViews)}</td>
               <td className="text-right" style={{ fontFamily: "var(--font-cinzel)", color: "var(--text-secondary)" }}>{fmt(totalLikes)}</td>
               <td className="text-right pr-4" style={{ fontFamily: "var(--font-cinzel)", color: "var(--text-secondary)" }}>{fmt(totalComments)}</td>
             </tr>
@@ -217,14 +217,14 @@ function EmptyState({ typeFilter }: { typeFilter: string }) {
   return (
     <div className="px-4 md:px-8 py-6 max-w-6xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl tracking-tight" style={{ fontFamily: "var(--font-cinzel)", color: "var(--navy)" }}>Analytics</h1>
+        <h1 className="text-2xl tracking-tight" style={{ fontFamily: "var(--font-cinzel)", color: "var(--cream)" }}>Analytics</h1>
       </div>
       <div className="cms-card text-center py-16">
         <p className="text-4xl mb-3" style={{ color: "var(--gold)" }}>◎</p>
         <p className="text-sm" style={{ color: "var(--text-muted)", fontStyle: "italic" }}>
           Noch keine Analytics-Daten. Sobald Content mit Plattform-IDs verknüpft ist, werden Snapshots automatisch alle 24h gezogen.
         </p>
-        <Link href="/content" className="inline-block mt-4 text-xs px-4 py-2 rounded" style={{ background: "var(--navy)", color: "var(--cream)", fontFamily: "var(--font-cinzel)" }}>
+        <Link href="/content" className="inline-block mt-4 text-xs px-4 py-2 rounded cms-glass-strong" style={{ color: "var(--cream)", fontFamily: "var(--font-cinzel)" }}>
           Content anlegen
         </Link>
       </div>

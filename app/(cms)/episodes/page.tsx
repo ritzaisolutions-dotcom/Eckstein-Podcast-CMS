@@ -1,13 +1,16 @@
 import { redirect } from "next/navigation";
 
+const FORWARD_KEYS = ["view", "status", "page", "q", "sort", "dir", "due"] as const;
+
 export default async function EpisodesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; status?: string; page?: string }>;
+  searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const params = await searchParams;
   const p = new URLSearchParams({ type: "lfc" });
-  if (params.status) p.set("status", params.status);
-  if (params.view === "table") p.set("view", "table");
+  for (const key of FORWARD_KEYS) {
+    if (params[key]) p.set(key, params[key]!);
+  }
   redirect(`/content?${p.toString()}`);
 }

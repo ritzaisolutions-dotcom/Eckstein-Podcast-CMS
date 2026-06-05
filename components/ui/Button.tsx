@@ -7,32 +7,32 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const VARIANTS = {
   primary: {
-    background: "var(--navy)",
+    background: "rgba(201,168,76,0.22)",
     color: "var(--cream)",
-    border: "transparent",
-    hoverBg: "var(--gold)",
-    hoverColor: "var(--navy)",
+    border: "rgba(201,168,76,0.45)",
+    hoverBg: "rgba(201,168,76,0.35)",
+    hoverColor: "var(--cream)",
   },
   secondary: {
-    background: "var(--bg-surface)",
-    color: "var(--navy)",
-    border: "var(--navy-3)",
-    hoverBg: "var(--bg-surface-2)",
-    hoverColor: "var(--navy)",
+    background: "rgba(245,238,216,0.06)",
+    color: "var(--cream)",
+    border: "var(--glass-border-subtle)",
+    hoverBg: "rgba(245,238,216,0.1)",
+    hoverColor: "var(--gold-light)",
   },
   ghost: {
     background: "transparent",
-    color: "var(--navy)",
+    color: "var(--text-on-glass-muted)",
     border: "transparent",
-    hoverBg: "var(--bg-surface-2)",
-    hoverColor: "var(--navy)",
+    hoverBg: "rgba(245,238,216,0.06)",
+    hoverColor: "var(--cream)",
   },
   danger: {
     background: "transparent",
-    color: "#c0392b",
-    border: "#c0392b",
-    hoverBg: "#c0392b",
-    hoverColor: "var(--cream)",
+    color: "#e57373",
+    border: "rgba(229,115,115,0.45)",
+    hoverBg: "rgba(229,115,115,0.15)",
+    hoverColor: "#ffcdd2",
   },
 };
 

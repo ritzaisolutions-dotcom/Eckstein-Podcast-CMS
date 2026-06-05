@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { TYPE_FILTER_PILLS, buildContentHubUrl, type HubView } from "@/lib/content-hub";
+import { TYPE_FILTER_PILLS, buildContentHubUrl, buildContentNewUrl, PUBLISH_STATUS_LABELS, type HubView } from "@/lib/content-hub";
 
 interface ContentHubHeaderProps {
   count: number;
@@ -53,7 +53,7 @@ export default function ContentHubHeader({
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex rounded border overflow-hidden" style={{ borderColor: "var(--glass-border-subtle)" }}>
+          <div className="hidden md:flex rounded border overflow-hidden" style={{ borderColor: "var(--glass-border-subtle)" }}>
             <Link
               href={url({ view: "board" })}
               className="text-xs px-3 py-2 transition-colors"
@@ -79,7 +79,7 @@ export default function ContentHubHeader({
             </Link>
           </div>
           <Link
-            href={typeFilter ? `/content/new?type=${typeFilter}` : "/content/new"}
+            href={buildContentNewUrl(base, typeFilter || undefined)}
             className="text-xs px-4 py-2 rounded cms-glass-strong"
             style={{ color: "var(--cream)", fontFamily: "var(--font-cinzel)", letterSpacing: "0.08em" }}
           >
@@ -109,7 +109,7 @@ export default function ContentHubHeader({
             className="text-xs px-3 py-1.5 rounded border transition-colors"
             style={pillStyle(statusFilter === s)}
           >
-            {s === "" ? "Alle Status" : s === "draft" ? "Entwurf" : s === "scheduled" ? "Geplant" : "Live"}
+            {PUBLISH_STATUS_LABELS[s] ?? s}
           </Link>
         ))}
 

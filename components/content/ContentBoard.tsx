@@ -1,12 +1,13 @@
 import ContentCard from "./ContentCard";
 import type { HubPiece } from "@/lib/content-hub";
-import { LIFECYCLE_STAGES, lifecycleLabel } from "@/lib/content-hub";
+import { LIFECYCLE_STAGES, lifecycleLabel, buildContentDetailUrl } from "@/lib/content-hub";
 
 interface ContentBoardProps {
   pieces: HubPiece[];
+  returnTo?: string;
 }
 
-export default function ContentBoard({ pieces }: ContentBoardProps) {
+export default function ContentBoard({ pieces, returnTo }: ContentBoardProps) {
   const byStage: Record<string, HubPiece[]> = {};
   for (const stage of LIFECYCLE_STAGES) byStage[stage] = [];
   for (const piece of pieces) {
@@ -42,7 +43,7 @@ export default function ContentBoard({ pieces }: ContentBoardProps) {
               </p>
             ) : (
               columnPieces.map(piece => (
-                <ContentCard key={piece.id} piece={piece} />
+                <ContentCard key={piece.id} piece={piece} href={buildContentDetailUrl(piece.id, returnTo)} />
               ))
             )}
           </div>

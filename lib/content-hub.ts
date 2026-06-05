@@ -156,3 +156,34 @@ export function buildContentHubUrl(params: {
 export function defaultViewFromParam(viewParam: string | undefined): HubView {
   return viewParam === "table" ? "table" : "board";
 }
+
+export function buildContentDetailUrl(id: string, returnTo?: string): string {
+  if (!returnTo || returnTo === "/content") return `/content/${id}`;
+  return `/content/${id}?returnTo=${encodeURIComponent(returnTo)}`;
+}
+
+export function buildContentNewUrl(
+  hubParams: { type?: string; q?: string; status?: string; sort?: string; dir?: string; view?: string; due?: string },
+  typeOverride?: string,
+): string {
+  const p = new URLSearchParams();
+  const type = typeOverride ?? hubParams.type;
+  if (type) p.set("type", type);
+  p.set("returnTo", buildContentHubUrl(hubParams));
+  return `/content/new?${p.toString()}`;
+}
+
+export const EMPTY_CTA_LABELS: Record<string, string> = {
+  "": "Ersten Content anlegen",
+  lfc: "Erste Episode anlegen",
+  sfc: "Ersten Short anlegen",
+  article: "Ersten Artikel anlegen",
+  social_post: "Ersten Post anlegen",
+};
+
+export const PUBLISH_STATUS_LABELS: Record<string, string> = {
+  "": "Alle Status",
+  draft: "Unveröffentlicht",
+  scheduled: "Geplant",
+  published: "Live",
+};

@@ -149,7 +149,7 @@ export default async function Dashboard() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl tracking-tight" style={{ fontFamily: "var(--font-cinzel)", color: "var(--navy)" }}>Dashboard</h1>
+          <h1 className="text-2xl tracking-tight" style={{ fontFamily: "var(--font-cinzel)", color: "var(--cream)" }}>Dashboard</h1>
           <p className="text-sm mt-0.5" style={{ fontFamily: "var(--font-eb-garamond)", color: "var(--text-muted)", fontStyle: "italic" }}>
             {formatDate(today)}
           </p>
@@ -160,7 +160,7 @@ export default async function Dashboard() {
               {kpiNumber ? `EP.${kpiNumber}` : "Letzte Episode"} · Views
             </span>
             <div className="flex items-baseline gap-1.5 justify-end">
-              <span className="text-2xl" style={{ fontFamily: "var(--font-cinzel)", color: "var(--navy)" }}>{fmt(kpiViews)}</span>
+              <span className="text-2xl" style={{ fontFamily: "var(--font-cinzel)", color: "var(--gold-light)" }}>{fmt(kpiViews)}</span>
               {kpiPrevViews > 0 && (
                 <span className="text-xs" style={{ color: kpiViews >= kpiPrevViews ? "#4caf7d" : "#c0392b" }}>
                   {kpiViews >= kpiPrevViews ? "↑" : "↓"}
@@ -177,7 +177,7 @@ export default async function Dashboard() {
           <span className="text-xs uppercase tracking-widest" style={{ fontFamily: "var(--font-cinzel)", color: "var(--text-muted)", fontSize: "0.55rem" }}>
             Content Pieces gesamt
           </span>
-          <div className="text-4xl mt-0.5" style={{ fontFamily: "var(--font-cinzel)", color: "var(--navy)", lineHeight: 1 }}>
+          <div className="text-4xl mt-0.5" style={{ fontFamily: "var(--font-cinzel)", color: "var(--gold-light)", lineHeight: 1 }}>
             {totalCount}
           </div>
         </div>
@@ -195,7 +195,7 @@ export default async function Dashboard() {
           { type: "social_post", label: "Beiträge",  sub: "Social Posts" },
         ].map(({ type, label, sub }) => (
           <Link key={type} href={`/content?type=${type}`} className="cms-card hover:border-gold transition-colors text-center py-4">
-            <div className="text-2xl" style={{ fontFamily: "var(--font-cinzel)", color: "var(--navy)" }}>
+            <div className="text-2xl" style={{ fontFamily: "var(--font-cinzel)", color: "var(--gold-light)" }}>
               {countByType[type] ?? 0}
             </div>
             <div className="text-xs mt-0.5 uppercase tracking-widest" style={{ fontFamily: "var(--font-cinzel)", color: "var(--text-muted)", fontSize: "0.6rem" }}>
@@ -277,7 +277,7 @@ export default async function Dashboard() {
                             fontFamily: "var(--font-cinzel)",
                             fontSize: "0.48rem",
                             letterSpacing: "0.04em",
-                            background: i < stageIdx ? "var(--cream-mid)" : i === stageIdx ? "rgba(201,168,76,0.2)" : "transparent",
+                            background: i < stageIdx ? "rgba(245,238,216,0.08)" : i === stageIdx ? "rgba(201,168,76,0.2)" : "transparent",
                             color: i < stageIdx ? "var(--text-muted)" : i === stageIdx ? "var(--gold)" : "var(--border)",
                             textDecoration: i < stageIdx ? "line-through" : "none",
                             border: i === stageIdx ? "1px solid rgba(201,168,76,0.4)" : "1px solid transparent",
@@ -370,7 +370,7 @@ export default async function Dashboard() {
               const slug = platformMap[p.platformId] ?? String(p.platformId);
               return (
                 <div key={p.platformId} className="text-center py-2">
-                  <div className="text-lg" style={{ fontFamily: "var(--font-cinzel)", color: "var(--navy)" }}>{fmt(Number(p.views))}</div>
+                  <div className="text-lg" style={{ fontFamily: "var(--font-cinzel)", color: "var(--gold-light)" }}>{fmt(Number(p.views))}</div>
                   <div className="text-xs uppercase tracking-widest mt-0.5" style={{ fontFamily: "var(--font-cinzel)", color: "var(--text-muted)", fontSize: "0.55rem" }}>
                     {slug.replace("_", " ")}
                   </div>
@@ -383,7 +383,7 @@ export default async function Dashboard() {
 
       {/* Leitwort */}
       <div className="mt-8 mb-2 text-center py-6 border-t" style={{ borderColor: "var(--border)" }}>
-        <p className="text-xl md:text-2xl" style={{ fontFamily: "var(--font-cormorant)", fontStyle: "italic", color: "var(--navy-3)", letterSpacing: "0.02em", lineHeight: 1.4 }}>
+        <p className="text-xl md:text-2xl" style={{ fontFamily: "var(--font-cormorant)", fontStyle: "italic", color: "var(--text-on-glass-muted)", letterSpacing: "0.02em", lineHeight: 1.4 }}>
           »Denn aus ihm und durch ihn und auf ihn hin ist alles.«
         </p>
         <p className="text-xs mt-2 tracking-widest uppercase" style={{ fontFamily: "var(--font-cinzel)", color: "var(--gold)", fontSize: "0.6rem" }}>

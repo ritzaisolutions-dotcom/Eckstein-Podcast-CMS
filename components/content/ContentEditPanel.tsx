@@ -7,6 +7,7 @@ import LifecycleStepper from "./LifecycleStepper";
 import PlatformDotRow, { type PlatformLinkState } from "./PlatformDotRow";
 import Badge from "@/components/ui/Badge";
 import { TYPE_LABELS } from "@/lib/content-hub";
+import { toDatetimeLocalValue } from "@/lib/datetime-local";
 
 export interface ContentEditData {
   id: string;
@@ -24,18 +25,19 @@ export interface ContentEditData {
 
 type Tab = "status" | "details" | "content";
 
-function toDatetimeLocal(iso: string | null): string {
-  if (!iso) return "";
-  return new Date(iso).toISOString().slice(0, 16);
-}
-
-export default function ContentEditPanel({ data }: { data: ContentEditData }) {
+export default function ContentEditPanel({
+  data,
+  hubBackHref = "/content",
+}: {
+  data: ContentEditData;
+  hubBackHref?: string;
+}) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("status");
   const [lifecycleStage, setLifecycleStage] = useState(data.lifecycleStage);
   const [episodeNumber, setEpisodeNumber] = useState(data.episodeNumber != null ? String(data.episodeNumber) : "");
-  const [filmingDate, setFilmingDate] = useState(toDatetimeLocal(data.filmingDate));
-  const [uploadDate, setUploadDate] = useState(toDatetimeLocal(data.uploadDate));
+  const [filmingDate, setFilmingDate] = useState(toDatetimeLocalValue(data.filmingDate));
+  const [uploadDate, setUploadDate] = useState(toDatetimeLocalValue(data.uploadDate));
   const [title, setTitle] = useState(data.title);
   const [bio, setBio] = useState(data.bio ?? "");
   const [bodyMd, setBodyMd] = useState(data.bodyMd ?? "");
@@ -104,7 +106,7 @@ export default function ContentEditPanel({ data }: { data: ContentEditData }) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4" key={data.id}>
       <div className="cms-glass-strong p-4">
         <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
           <div>
@@ -118,7 +120,7 @@ export default function ContentEditPanel({ data }: { data: ContentEditData }) {
               {data.title}
             </h2>
           </div>
-          <Link href="/content" className="text-xs" style={{ color: "var(--text-on-glass-muted)", fontFamily: "var(--font-cinzel)" }}>
+          <Link href={hubBackHref} className="text-xs" style={{ color: "var(--text-on-glass-muted)", fontFamily: "var(--font-cinzel)" }}>
             ← Hub
           </Link>
         </div>
@@ -230,7 +232,7 @@ export default function ContentEditPanel({ data }: { data: ContentEditData }) {
                 {saving ? "Speichern…" : "Inhalt speichern"}
               </button>
               <Link
-                href={`/content/${data.id}/advanced`}
+                href={`/content/${data.id}/advanced${hubBackHref !== "/content" ? `?returnTo=${encodeURIComponent(hubBackHref)}` : ""}`}
                 className="text-xs px-4 py-2 rounded border self-center"
                 style={{ borderColor: "var(--glass-border-subtle)", color: "var(--text-on-glass-muted)", fontFamily: "var(--font-cinzel)" }}
                 title="SFC-LFC-Verknüpfung, Analytics-IDs, alle Plattformen"

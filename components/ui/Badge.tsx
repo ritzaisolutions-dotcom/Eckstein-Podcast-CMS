@@ -1,22 +1,22 @@
 type Status = "draft" | "scheduled" | "published" | "posted" | "idea" | "in_arbeit" | "umgesetzt" | "verworfen" | "sammeln" | "strukturieren" | "ready_to_record" | "recorded" | string;
 
 const STATUS_STYLES: Record<string, { bg: string; color: string; border: string }> = {
-  draft:            { bg: "transparent",            color: "var(--navy-3)",   border: "var(--navy-3)" },
-  idea:             { bg: "transparent",            color: "var(--navy-3)",   border: "var(--navy-3)" },
-  sammeln:          { bg: "transparent",            color: "var(--navy-3)",   border: "var(--navy-3)" },
-  scheduled:        { bg: "var(--gold)",            color: "var(--navy)",     border: "var(--gold)" },
-  strukturieren:    { bg: "rgba(201,168,76,0.2)",   color: "var(--navy)",     border: "var(--gold)" },
-  in_arbeit:        { bg: "rgba(201,168,76,0.2)",   color: "var(--navy)",     border: "var(--gold)" },
-  published:        { bg: "var(--navy)",            color: "var(--cream)",    border: "var(--navy)" },
-  posted:           { bg: "var(--navy)",            color: "var(--cream)",    border: "var(--navy)" },
-  umgesetzt:        { bg: "var(--navy)",            color: "var(--cream)",    border: "var(--navy)" },
-  ready_to_record:  { bg: "var(--gold-light)",      color: "var(--navy)",     border: "var(--gold-light)" },
-  recorded:         { bg: "var(--navy-3)",          color: "var(--cream)",    border: "var(--navy-3)" },
-  verworfen:        { bg: "transparent",            color: "rgba(12,30,53,0.35)", border: "rgba(12,30,53,0.2)" },
+  draft:            { bg: "rgba(245,238,216,0.06)", color: "var(--text-on-glass-muted)", border: "var(--glass-border-subtle)" },
+  idea:             { bg: "rgba(245,238,216,0.06)", color: "var(--text-on-glass-muted)", border: "var(--glass-border-subtle)" },
+  sammeln:          { bg: "rgba(245,238,216,0.06)", color: "var(--text-on-glass-muted)", border: "var(--glass-border-subtle)" },
+  scheduled:        { bg: "rgba(201,168,76,0.2)",   color: "var(--gold-light)",          border: "rgba(201,168,76,0.45)" },
+  strukturieren:    { bg: "rgba(201,168,76,0.15)",  color: "var(--gold-pale)",           border: "rgba(201,168,76,0.35)" },
+  in_arbeit:        { bg: "rgba(201,168,76,0.15)",  color: "var(--gold-pale)",           border: "rgba(201,168,76,0.35)" },
+  published:        { bg: "rgba(76,175,125,0.18)",  color: "#4caf7d",                    border: "rgba(76,175,125,0.35)" },
+  posted:           { bg: "rgba(76,175,125,0.18)",  color: "#4caf7d",                    border: "rgba(76,175,125,0.35)" },
+  umgesetzt:        { bg: "rgba(76,175,125,0.18)",  color: "#4caf7d",                    border: "rgba(76,175,125,0.35)" },
+  ready_to_record:  { bg: "rgba(201,168,76,0.25)",  color: "var(--gold-light)",          border: "var(--gold)" },
+  recorded:         { bg: "rgba(245,238,216,0.1)",  color: "var(--cream)",               border: "var(--glass-border-subtle)" },
+  verworfen:        { bg: "transparent",            color: "rgba(245,238,216,0.35)",     border: "rgba(245,238,216,0.15)" },
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  draft: "Entwurf",
+  draft: "Unveröffentlicht",
   scheduled: "Geplant",
   published: "Live",
   posted: "Gepostet",

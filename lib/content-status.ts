@@ -4,13 +4,23 @@ function hasTimestamp(value: string | Date | null | undefined): boolean {
   return String(value).trim().length > 0;
 }
 
+function hasUrl(url: string | null | undefined): boolean {
+  return Boolean(url?.trim());
+}
+
+export interface PlatformLinkStatusInput {
+  url?: string | null;
+  scheduledAt?: string | Date | null;
+  postedAt?: string | Date | null;
+}
+
 /** Derive publish status from lifecycle + platform links — not manually editable. */
 export function deriveContentStatus(
   lifecycleStage: string,
-  platformLinks: { scheduledAt?: string | Date | null; postedAt?: string | Date | null }[],
+  platformLinks: PlatformLinkStatusInput[],
 ): "draft" | "scheduled" | "published" {
   if (lifecycleStage === "live") return "published";
   if (platformLinks.some(l => hasTimestamp(l.postedAt))) return "published";
-  if (platformLinks.some(l => hasTimestamp(l.scheduledAt))) return "scheduled";
+  if (platformLinks.some(l => hasTimestamp(l.scheduledAt) || hasUrl(l.url))) return "scheduled";
   return "draft";
 }

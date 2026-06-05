@@ -7,6 +7,7 @@ export async function syncContentStatus(contentId: string, lifecycleStage: strin
   const db = getDb();
   const links = await db
     .select({
+      url: contentPlatformLinks.url,
       scheduledAt: contentPlatformLinks.scheduledAt,
       postedAt: contentPlatformLinks.postedAt,
     })

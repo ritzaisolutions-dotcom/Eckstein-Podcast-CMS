@@ -6,6 +6,7 @@ import { getCachedPlatforms, invalidateContentCaches } from "@/lib/cache";
 import { requireSession } from "@/lib/require-session";
 import { isContentType, validatePlatformLinks } from "@/lib/platforms";
 import { deriveContentStatus } from "@/lib/content-status";
+import { syncContentStatus } from "@/lib/content-sync";
 
 export async function GET(req: NextRequest) {
   const authError = await requireSession(req);
@@ -103,6 +104,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  await syncContentStatus(id, lifecycleStage ?? "draft");
   invalidateContentCaches();
   return NextResponse.json({ id });
 }

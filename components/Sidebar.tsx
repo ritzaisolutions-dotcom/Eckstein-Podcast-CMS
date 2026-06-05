@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 interface NavItem {
   href: string;
@@ -9,6 +9,7 @@ interface NavItem {
   icon: string;
   badge?: number;
   hero?: boolean;
+  matchType?: string;
 }
 
 const NAV_MAIN: NavItem[] = [
@@ -16,7 +17,7 @@ const NAV_MAIN: NavItem[] = [
   { href: "/content", label: "Content", icon: "▤", hero: true },
   { href: "/analytics", label: "Analytics", icon: "◎" },
   { href: "/prep", label: "Episode Prep", icon: "◉" },
-  { href: "/content?type=article", label: "Das Fundament", icon: "✦" },
+  { href: "/content?type=article", label: "Das Fundament", icon: "✦", matchType: "article" },
   { href: "/mind-dump", label: "Ideen & Topics", icon: "⊕" },
 ];
 
@@ -77,11 +78,24 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
 
-  function isActive(href: string) {
-    if (href === "/") return pathname === "/";
-    return pathname.startsWith(href);
+  function isActive(item: NavItem) {
+    if (item.href === "/") return pathname === "/";
+
+    if (item.matchType) {
+      return pathname === "/content" && searchParams.get("type") === item.matchType;
+    }
+
+    if (item.href === "/content") {
+      if (pathname !== "/content") return false;
+      const type = searchParams.get("type");
+      return !type || type === "lfc" || type === "sfc" || type === "social_post";
+    }
+
+    const pathOnly = item.href.split("?")[0];
+    return pathname === pathOnly || pathname.startsWith(`${pathOnly}/`);
   }
 
   async function handleLogout() {
@@ -115,13 +129,13 @@ export default function Sidebar() {
 
         <nav className="flex-1 overflow-y-auto px-2 py-3 flex flex-col gap-1">
           {NAV_MAIN.map(item => (
-            <NavLink key={item.href} item={item} active={isActive(item.href)} />
+            <NavLink key={item.href} item={item} active={isActive(item)} />
           ))}
         </nav>
 
         <div className="px-2 pb-2 flex flex-col gap-0.5 border-t border-[var(--glass-border-subtle)] pt-2">
           {NAV_BOTTOM.map(item => (
-            <NavLink key={item.href} item={item} active={isActive(item.href)} />
+            <NavLink key={item.href} item={item} active={isActive(item)} />
           ))}
           <button
             onClick={handleLogout}
@@ -140,7 +154,7 @@ export default function Sidebar() {
             key={item.href}
             href={item.href}
             className="flex flex-col items-center gap-0.5 px-2 py-1 rounded transition-all"
-            style={{ color: isActive(item.href) ? "var(--gold-light)" : "var(--text-on-glass-muted)" }}
+            style={{ color: isActive(item) ? "var(--gold-light)" : "var(--text-on-glass-muted)" }}
           >
             <span style={{ fontSize: "1rem" }}>{item.icon}</span>
             <span className="text-xs" style={{ fontFamily: "var(--font-cinzel)", fontSize: "0.5rem", letterSpacing: "0.05em" }}>

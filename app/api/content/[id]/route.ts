@@ -5,11 +5,12 @@ import {
   analyticsSnapshots, mediaAssetLinks, contentTags,
   episodeTasks, clipQueue, episodePreps,
 } from "@/lib/db/schema";
-import { eq, or } from "drizzle-orm";
+import { eq, or, and, inArray } from "drizzle-orm";
 import { getCachedPlatforms, invalidateContentCaches } from "@/lib/cache";
 import { requireSession } from "@/lib/require-session";
-import { isContentType, validatePlatformLinks } from "@/lib/platforms";
+import { isContentType, validatePlatformLinks, allowedPlatformSlugs } from "@/lib/platforms";
 import { syncContentStatus } from "@/lib/content-sync";
+import { toDatetimeLocalValue } from "@/lib/datetime-local";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const authError = await requireSession(req);
@@ -29,11 +30,29 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     slug: idToSlug[l.platformId] ?? String(l.platformId),
     url: l.url ?? "",
     externalId: l.externalId ?? "",
-    scheduledAt: l.scheduledAt ? l.scheduledAt.toISOString().slice(0, 16) : "",
+    scheduledAt: l.scheduledAt ? toDatetimeLocalValue(l.scheduledAt) : "",
     postedAt: l.postedAt ? l.postedAt.toISOString() : null,
   }));
 
   return NextResponse.json({ ...piece, platformLinks });
+}
+
+async function pruneDisallowedLinks(db: ReturnType<typeof getDb>, contentId: string, type: string) {
+  const allowed = allowedPlatformSlugs(type);
+  const platformRows = await getCachedPlatforms();
+  const slugToId = Object.fromEntries(platformRows.map(p => [p.slug, p.id]));
+  const disallowedIds = platformRows
+    .filter(p => !allowed.has(p.slug))
+    .map(p => p.id);
+
+  if (disallowedIds.length === 0) return;
+
+  await db
+    .delete(contentPlatformLinks)
+    .where(and(
+      eq(contentPlatformLinks.contentId, contentId),
+      inArray(contentPlatformLinks.platformId, disallowedIds),
+    ));
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -86,33 +105,36 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     })
     .where(eq(contentPieces.id, id));
 
-  if (platformLinks !== undefined) {
-    await db.delete(contentPlatformLinks).where(eq(contentPlatformLinks.contentId, id));
-
-    if (platformLinks.length > 0) {
-      const platformRows = await getCachedPlatforms();
-      const slugToId = Object.fromEntries(platformRows.map(p => [p.slug, p.id]));
-
-      const linksToInsert = platformLinks
-        .filter((l: { slug: string }) => slugToId[l.slug])
-        .map((l: { slug: string; url: string; externalId: string; scheduledAt: string; postedAt?: string | null }) => ({
-          contentId: id,
-          platformId: slugToId[l.slug],
-          url: l.url || null,
-          externalId: l.externalId || null,
-          scheduledAt: l.scheduledAt ? new Date(l.scheduledAt) : null,
-          postedAt: l.postedAt ? new Date(l.postedAt) : null,
-        }));
-
-      if (linksToInsert.length > 0) {
-        await db.insert(contentPlatformLinks).values(linksToInsert);
-      }
-    }
+  if (nextType !== piece.type) {
+    await pruneDisallowedLinks(db, id, nextType);
   }
 
-  await syncContentStatus(id, nextLifecycle);
+  if (platformLinks !== undefined) {
+    const platformRows = await getCachedPlatforms();
+    const slugToId = Object.fromEntries(platformRows.map(p => [p.slug, p.id]));
+
+    const linksToInsert = platformLinks
+      .filter((l: { slug: string }) => slugToId[l.slug])
+      .map((l: { slug: string; url: string; externalId: string; scheduledAt: string; postedAt?: string | null }) => ({
+        contentId: id,
+        platformId: slugToId[l.slug],
+        url: l.url || null,
+        externalId: l.externalId || null,
+        scheduledAt: l.scheduledAt ? new Date(l.scheduledAt) : null,
+        postedAt: l.postedAt ? new Date(l.postedAt) : null,
+      }));
+
+    await db.transaction(async (tx) => {
+      await tx.delete(contentPlatformLinks).where(eq(contentPlatformLinks.contentId, id));
+      if (linksToInsert.length > 0) {
+        await tx.insert(contentPlatformLinks).values(linksToInsert);
+      }
+    });
+  }
+
+  const status = await syncContentStatus(id, nextLifecycle);
   invalidateContentCaches();
-  return NextResponse.json({ id });
+  return NextResponse.json({ id, status });
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

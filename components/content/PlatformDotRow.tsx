@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getPlatformsForType, PLATFORM_PLACEHOLDER_URL } from "@/lib/platforms";
 import { platformDotState, type DotState } from "@/lib/content-hub";
+import { toDatetimeLocalValue } from "@/lib/datetime-local";
 
 export interface PlatformLinkState {
   slug: string;
@@ -24,26 +25,33 @@ function dotClass(state: DotState) {
   return "cms-dot cms-dot-off";
 }
 
-function toDatetimeLocal(iso: string | null): string {
-  if (!iso) return "";
-  return new Date(iso).toISOString().slice(0, 16);
+function buildLinksMap(contentType: string, initialLinks: PlatformLinkState[]): Record<string, PlatformLinkState> {
+  const defs = getPlatformsForType(contentType);
+  const map: Record<string, PlatformLinkState> = {};
+  for (const def of defs) {
+    const existing = initialLinks.find(l => l.slug === def.slug);
+    map[def.slug] = existing
+      ? {
+          ...existing,
+          scheduledAt: toDatetimeLocalValue(existing.scheduledAt || null),
+        }
+      : { slug: def.slug, url: "", scheduledAt: "", postedAt: null };
+  }
+  return map;
 }
 
 export default function PlatformDotRow({ contentId, contentType, links: initialLinks }: PlatformDotRowProps) {
   const router = useRouter();
   const defs = getPlatformsForType(contentType);
-  const [links, setLinks] = useState<Record<string, PlatformLinkState>>(() => {
-    const map: Record<string, PlatformLinkState> = {};
-    for (const def of defs) {
-      const existing = initialLinks.find(l => l.slug === def.slug);
-      map[def.slug] = existing ?? { slug: def.slug, url: "", scheduledAt: "", postedAt: null };
-    }
-    return map;
-  });
+  const [links, setLinks] = useState<Record<string, PlatformLinkState>>(() => buildLinksMap(contentType, initialLinks));
   const [openSlug, setOpenSlug] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const popoverRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setLinks(buildLinksMap(contentType, initialLinks));
+  }, [contentId, contentType, initialLinks]);
 
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
@@ -74,7 +82,7 @@ export default function PlatformDotRow({ contentId, contentType, links: initialL
         [slug]: {
           slug,
           url: data.url ?? "",
-          scheduledAt: data.scheduledAt ? toDatetimeLocal(data.scheduledAt) : "",
+          scheduledAt: data.scheduledAt ? toDatetimeLocalValue(data.scheduledAt) : "",
           postedAt: data.postedAt ?? null,
         },
       }));
