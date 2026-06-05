@@ -79,14 +79,14 @@ export default async function ClipQueuePage({
                       <td style={{ color: "var(--navy)", fontFamily: "var(--font-eb-garamond)" }}>
                         {item.note ?? "—"}
                         {item.clipContentId && (
-                          <Link href={`/episodes/${item.clipContentId}`} className="ml-2 text-xs" style={{ color: "var(--gold)" }}>
+                          <Link href={`/content/${item.clipContentId}`} className="ml-2 text-xs" style={{ color: "var(--gold)" }}>
                             → Clip
                           </Link>
                         )}
                       </td>
                       <td style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
                         {ep ? (
-                          <Link href={`/episodes/${ep.id}`} className="hover:underline">
+                          <Link href={`/content/${ep.id}`} className="hover:underline">
                             {ep.episodeNumber ? `Ep.${ep.episodeNumber}` : ep.title}
                           </Link>
                         ) : "—"}

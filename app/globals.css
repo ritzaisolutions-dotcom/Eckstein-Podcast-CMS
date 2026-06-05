@@ -23,6 +23,18 @@
   --border: rgba(12, 30, 53, 0.12);
   --border-strong: var(--navy-3);
   --shadow: rgba(5, 16, 31, 0.08);
+
+  /* Liquid glass (CMS dark shell) */
+  --glass-bg: rgba(245, 238, 216, 0.06);
+  --glass-bg-strong: rgba(245, 238, 216, 0.11);
+  --glass-border: rgba(201, 168, 76, 0.22);
+  --glass-border-subtle: rgba(245, 238, 216, 0.1);
+  --glass-blur: 16px;
+  --glass-blur-strong: 20px;
+  --text-on-glass: rgba(245, 238, 216, 0.92);
+  --text-on-glass-muted: rgba(245, 238, 216, 0.5);
+  --cms-bg-gradient: radial-gradient(ellipse 120% 80% at 50% -20%, rgba(201, 168, 76, 0.08), transparent 55%),
+    linear-gradient(180deg, var(--navy) 0%, var(--navy-2) 45%, #040c18 100%);
 }
 
 @theme inline {
@@ -178,4 +190,172 @@ h4, h5, h6 {
   color: var(--text-muted);
   margin-bottom: 0.35rem;
   font-weight: 600;
+}
+
+/* ─── CMS Dark Shell (liquid glass app chrome) ─────────────────────────────── */
+.cms-shell {
+  --bg-app: transparent;
+  --bg-surface: var(--glass-bg);
+  --bg-surface-2: var(--glass-bg-strong);
+  --text-primary: var(--text-on-glass);
+  --text-secondary: rgba(245, 238, 216, 0.78);
+  --text-muted: var(--text-on-glass-muted);
+  --border: var(--glass-border-subtle);
+  --border-strong: var(--glass-border);
+  --shadow: rgba(0, 0, 0, 0.35);
+  background: var(--cms-bg-gradient);
+  color: var(--text-on-glass);
+  min-height: 100dvh;
+}
+
+.cms-shell h1,
+.cms-shell h2,
+.cms-shell h3 {
+  color: var(--cream);
+}
+
+.cms-shell h4,
+.cms-shell h5,
+.cms-shell h6 {
+  color: var(--gold-pale);
+}
+
+.cms-shell ::selection {
+  background: rgba(201, 168, 76, 0.35);
+  color: var(--cream);
+}
+
+.cms-shell ::-webkit-scrollbar-track {
+  background: rgba(5, 16, 31, 0.5);
+}
+
+.cms-shell ::-webkit-scrollbar-thumb {
+  background: rgba(201, 168, 76, 0.35);
+}
+
+.cms-glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border-subtle);
+  border-radius: 6px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(245, 238, 216, 0.06);
+}
+
+.cms-glass-strong {
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(var(--glass-blur-strong));
+  -webkit-backdrop-filter: blur(var(--glass-blur-strong));
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(245, 238, 216, 0.08);
+}
+
+.cms-glass-hover {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+}
+
+.cms-glass-hover:hover {
+  border-color: var(--glass-border);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(201, 168, 76, 0.12);
+  transform: translateY(-1px);
+}
+
+.cms-glass-column {
+  background: rgba(245, 238, 216, 0.03);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border-subtle);
+  border-radius: 8px;
+  min-height: 12rem;
+}
+
+.cms-glass-title {
+  font-family: var(--font-cinzel);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold-light);
+  font-weight: 600;
+}
+
+.cms-glass-nav-active {
+  background: rgba(201, 168, 76, 0.12);
+  border-left: 3px solid var(--gold);
+  color: var(--cream);
+}
+
+.cms-glass-nav-item {
+  border-left: 3px solid transparent;
+  color: var(--text-on-glass-muted);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.cms-glass-nav-item:hover {
+  background: rgba(245, 238, 216, 0.05);
+  color: var(--text-on-glass);
+}
+
+.cms-shell .cms-card {
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border-color: var(--glass-border-subtle);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.cms-shell .cms-card-title {
+  color: var(--gold-light);
+}
+
+.cms-shell .cms-table th {
+  background: rgba(245, 238, 216, 0.04);
+  color: var(--text-on-glass-muted);
+}
+
+.cms-shell .cms-table td {
+  color: var(--text-on-glass);
+  border-bottom-color: var(--glass-border-subtle);
+}
+
+.cms-shell .cms-table tr:hover td {
+  background: rgba(245, 238, 216, 0.04);
+}
+
+.cms-shell .cms-input {
+  background: rgba(5, 16, 31, 0.45);
+  border-color: var(--glass-border-subtle);
+  color: var(--text-on-glass);
+}
+
+.cms-shell .cms-input:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(201, 168, 76, 0.2);
+}
+
+.cms-shell .cms-label {
+  color: var(--text-on-glass-muted);
+}
+
+.cms-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.cms-dot-off {
+  background: transparent;
+  border: 1.5px solid rgba(245, 238, 216, 0.25);
+}
+
+.cms-dot-scheduled {
+  background: var(--gold);
+  box-shadow: 0 0 6px rgba(201, 168, 76, 0.45);
+}
+
+.cms-dot-live {
+  background: #4caf7d;
+  box-shadow: 0 0 6px rgba(76, 175, 125, 0.4);
 }

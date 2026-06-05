@@ -12,7 +12,7 @@ export default function PageHeader({ title, subtitle, description, actions }: Pa
         <div className="flex items-baseline gap-3">
           <h1
             className="text-2xl tracking-[0.08em] uppercase"
-            style={{ fontFamily: "var(--font-cinzel)", color: "var(--navy)" }}
+            style={{ fontFamily: "var(--font-cinzel)", color: "var(--text-primary)" }}
           >
             {title}
           </h1>

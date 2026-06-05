@@ -4,6 +4,8 @@ import { contentPieces, contentPlatformLinks } from "@/lib/db/schema";
 import { eq, count, and, ilike, desc } from "drizzle-orm";
 import { getCachedPlatforms, invalidateContentCaches } from "@/lib/cache";
 import { requireSession } from "@/lib/require-session";
+import { isContentType, validatePlatformLinks } from "@/lib/platforms";
+import { deriveContentStatus } from "@/lib/content-status";
 
 export async function GET(req: NextRequest) {
   const authError = await requireSession(req);
@@ -48,6 +50,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "type and title are required" }, { status: 400 });
   }
 
+  if (!isContentType(type)) {
+    return NextResponse.json({ error: `Ungültiger Content-Typ: ${type}` }, { status: 400 });
+  }
+
+  const platformError = validatePlatformLinks(type, platformLinks);
+  if (platformError) {
+    return NextResponse.json({ error: platformError }, { status: 400 });
+  }
+
   const db = getDb();
   const id = crypto.randomUUID();
 
@@ -68,7 +79,7 @@ export async function POST(req: NextRequest) {
     lifecycleStage: lifecycleStage ?? "draft",
     uploadDate: uploadDate ? new Date(uploadDate) : null,
     filmingDate: filmingDate ? new Date(filmingDate) : null,
-    status: lifecycleStage === "live" ? "published" : "draft",
+    status: deriveContentStatus(lifecycleStage ?? "draft", platformLinks),
     parentId: parentId || null,
   });
 
@@ -78,12 +89,13 @@ export async function POST(req: NextRequest) {
 
     const linksToInsert = platformLinks
       .filter((l: { slug: string }) => slugToId[l.slug])
-      .map((l: { slug: string; url: string; externalId: string; scheduledAt: string }) => ({
+      .map((l: { slug: string; url: string; externalId: string; scheduledAt: string; postedAt?: string | null }) => ({
         contentId: id,
         platformId: slugToId[l.slug],
         url: l.url || null,
         externalId: l.externalId || null,
         scheduledAt: l.scheduledAt ? new Date(l.scheduledAt) : null,
+        postedAt: l.postedAt ? new Date(l.postedAt) : null,
       }));
 
     if (linksToInsert.length > 0) {

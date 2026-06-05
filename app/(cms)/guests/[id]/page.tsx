@@ -64,7 +64,7 @@ export default async function GuestDetailPage({ params }: { params: Promise<{ id
             <ul className="flex flex-col gap-2">
               {episodes.map(ep => (
                 <li key={ep.id}>
-                  <Link href={`/episodes/${ep.id}`} className="text-sm hover:underline" style={{ color: "var(--text-primary)", fontFamily: "var(--font-eb-garamond)" }}>
+                  <Link href={`/content/${ep.id}`} className="text-sm hover:underline" style={{ color: "var(--text-primary)", fontFamily: "var(--font-eb-garamond)" }}>
                     {ep.episodeNumber ? <span className="text-xs mr-1" style={{ color: "var(--text-muted)" }}>#{ep.episodeNumber}</span> : null}
                     {ep.title}
                   </Link>

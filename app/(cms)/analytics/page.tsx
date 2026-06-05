@@ -167,7 +167,7 @@ export default async function AnalyticsPage({
               return (
                 <tr key={piece.id}>
                   <td className="pl-4">
-                    <Link href={`/episodes/${piece.id}`} className="hover:underline" style={{ color: "var(--text-primary)", fontFamily: "var(--font-eb-garamond)" }}>
+                    <Link href={`/content/${piece.id}`} className="hover:underline" style={{ color: "var(--text-primary)", fontFamily: "var(--font-eb-garamond)" }}>
                       {piece.episodeNumber ? <span className="text-xs mr-1" style={{ color: "var(--text-muted)" }}>#{piece.episodeNumber}</span> : null}
                       {piece.title}
                     </Link>

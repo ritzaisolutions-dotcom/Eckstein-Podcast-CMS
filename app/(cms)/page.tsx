@@ -215,11 +215,16 @@ export default async function Dashboard() {
         <section className="cms-card">
           <div className="flex items-center justify-between mb-3">
             <h2 className="cms-card-title mb-0">Heute fällig</h2>
-            {dueTodayLinks.length > 0 && (
-              <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: "rgba(192,57,43,0.1)", color: "#c0392b", fontFamily: "var(--font-cinzel)", fontSize: "0.55rem" }}>
-                {dueTodayLinks.length}
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {dueTodayLinks.length > 0 && (
+                <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: "rgba(192,57,43,0.1)", color: "#c0392b", fontFamily: "var(--font-cinzel)", fontSize: "0.55rem" }}>
+                  {dueTodayLinks.length}
+                </span>
+              )}
+              <Link href="/content?due=today" className="text-xs" style={{ color: "var(--text-muted)", fontFamily: "var(--font-cinzel)", fontSize: "0.55rem" }}>
+                Hub →
+              </Link>
+            </div>
           </div>
           {dueTodayLinks.length === 0 ? (
             <p className="text-sm" style={{ color: "var(--text-muted)", fontStyle: "italic" }}>Alles erledigt ✓</p>
@@ -228,7 +233,7 @@ export default async function Dashboard() {
               {dueTodayLinks.map((item, i) => (
                 <li key={i} className="flex items-center gap-3 py-2 border-b last:border-0" style={{ borderColor: "var(--border)" }}>
                   <span className="w-3.5 h-3.5 rounded border shrink-0" style={{ borderColor: "var(--gold)" }} />
-                  <Link href={`/content?type=${item.type}`} className="text-sm hover:underline flex-1" style={{ color: "var(--text-primary)", fontFamily: "var(--font-eb-garamond)" }}>
+                  <Link href={`/content/${item.contentId}`} className="text-sm hover:underline flex-1" style={{ color: "var(--text-primary)", fontFamily: "var(--font-eb-garamond)" }}>
                     {item.episodeNumber ? `EP.${item.episodeNumber}` : item.title}
                     <span className="ml-1.5 text-xs" style={{ color: "var(--text-muted)" }}>
                       → {(platformMap[item.platformId] ?? "?").replace("_", " ").toUpperCase()}
@@ -257,10 +262,10 @@ export default async function Dashboard() {
                 return (
                   <li key={ep.id} className="flex items-center gap-2 py-2 border-b last:border-0" style={{ borderColor: "var(--border)" }}>
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ background: ampelColor(ep.lifecycleStage ?? "draft") }} />
-                    <Link href={`/episodes/${ep.id}`} className="text-xs shrink-0 hover:underline" style={{ color: "var(--text-muted)", fontFamily: "var(--font-cinzel)", minWidth: 36 }}>
+                    <Link href={`/content/${ep.id}`} className="text-xs shrink-0 hover:underline" style={{ color: "var(--text-muted)", fontFamily: "var(--font-cinzel)", minWidth: 36 }}>
                       {ep.episodeNumber ? `EP.${ep.episodeNumber}` : `#${ep.contentId}`}
                     </Link>
-                    <Link href={`/episodes/${ep.id}`} className="text-sm hover:underline flex-1 truncate" style={{ color: "var(--text-primary)", fontFamily: "var(--font-eb-garamond)" }}>
+                    <Link href={`/content/${ep.id}`} className="text-sm hover:underline flex-1 truncate" style={{ color: "var(--text-primary)", fontFamily: "var(--font-eb-garamond)" }}>
                       {ep.title}
                     </Link>
                     <div className="flex gap-0.5 shrink-0">
@@ -306,7 +311,7 @@ export default async function Dashboard() {
                         DREH
                       </span>
                     )}
-                    <Link href={`/episodes/${item.id}`} className="text-sm hover:underline flex-1" style={{ color: "var(--text-secondary)", fontFamily: "var(--font-eb-garamond)" }}>
+                    <Link href={`/content/${item.id}`} className="text-sm hover:underline flex-1" style={{ color: "var(--text-secondary)", fontFamily: "var(--font-eb-garamond)" }}>
                       {item.episodeNumber ? `EP.${item.episodeNumber}` : item.title}
                     </Link>
                     {date && (

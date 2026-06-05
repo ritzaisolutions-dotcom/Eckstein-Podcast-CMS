@@ -4,6 +4,12 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Button from "./ui/Button";
 import LfcPickerModal from "./LfcPickerModal";
+import {
+  getPlatformsForType,
+  PLATFORM_PLACEHOLDER_URL,
+  supportsAnalyticsExternalId,
+} from "@/lib/platforms";
+import { LIFECYCLE_OPTIONS } from "@/lib/lifecycle";
 
 interface ParentLfc {
   id: string;
@@ -12,59 +18,11 @@ interface ParentLfc {
   typeIndex: number | null;
 }
 
-// ─── Platform definitions per content type ────────────────────────────────────
-
-const PLATFORMS_BY_TYPE: Record<string, { slug: string; label: string; color: string; bg: string }[]> = {
-  lfc: [
-    { slug: "youtube",  label: "YouTube",  color: "#c9a84c", bg: "rgba(201,168,76,0.15)" },
-    { slug: "rumble",   label: "Rumble",   color: "#05101f", bg: "rgba(12,30,53,0.08)" },
-    { slug: "spotify",  label: "Spotify",  color: "#4caf7d", bg: "rgba(76,175,125,0.12)" },
-  ],
-  sfc: [
-    { slug: "yt_shorts",  label: "YT Shorts",  color: "#c9a84c", bg: "rgba(201,168,76,0.15)" },
-    { slug: "ig_reels",   label: "IG Reels",   color: "#c9a84c", bg: "rgba(201,168,76,0.1)" },
-    { slug: "tiktok",     label: "TikTok",     color: "#05101f", bg: "rgba(12,30,53,0.08)" },
-    { slug: "rumble",     label: "Rumble",     color: "#05101f", bg: "rgba(12,30,53,0.08)" },
-  ],
-  article: [
-    { slug: "substack", label: "Substack", color: "#c9a84c", bg: "rgba(201,168,76,0.12)" },
-    { slug: "x",        label: "X",        color: "#05101f", bg: "rgba(12,30,53,0.08)" },
-    { slug: "website",  label: "Website",  color: "#05101f", bg: "rgba(12,30,53,0.06)" },
-  ],
-  social_post: [
-    { slug: "instagram", label: "Instagram", color: "#c9a84c", bg: "rgba(201,168,76,0.1)" },
-    { slug: "x",         label: "X",         color: "#05101f", bg: "rgba(12,30,53,0.08)" },
-    { slug: "tiktok",    label: "TikTok",    color: "#05101f", bg: "rgba(12,30,53,0.08)" },
-  ],
-};
-
-const PLACEHOLDER_URL: Record<string, string> = {
-  youtube:   "https://youtu.be/...",
-  yt_shorts: "https://youtube.com/shorts/...",
-  rumble:    "https://rumble.com/v...",
-  spotify:   "https://open.spotify.com/episode/...",
-  ig_reels:  "https://www.instagram.com/reel/...",
-  instagram: "https://www.instagram.com/p/...",
-  tiktok:    "https://www.tiktok.com/@eckstein_podcast/video/...",
-  substack:  "https://eckstein.substack.com/p/...",
-  x:         "https://x.com/EcksteinPodcast/status/...",
-  website:   "https://eckstein-podcast.de/...",
-};
-
 const CONTENT_TYPE_OPTIONS = [
   { value: "lfc",         label: "LFC — Long Form Content" },
   { value: "sfc",         label: "SFC — Short Form Content" },
   { value: "article",     label: "Article — Das Fundament" },
   { value: "social_post", label: "Beitrag — Social Post" },
-];
-
-const LIFECYCLE_OPTIONS = [
-  { value: "draft",     label: "Draft" },
-  { value: "scripting", label: "Scripting" },
-  { value: "filming",   label: "Filming" },
-  { value: "editing",   label: "Editing" },
-  { value: "revision",  label: "Revision" },
-  { value: "live",      label: "Live" },
 ];
 
 interface PlatformLink {
@@ -101,7 +59,9 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
   const [parentLfc, setParentLfc] = useState<ParentLfc | null>(null);
   const [showLfcPicker, setShowLfcPicker] = useState(false);
 
-  const availablePlatforms = PLATFORMS_BY_TYPE[contentType] ?? [];
+  const availablePlatforms = getPlatformsForType(contentType);
+  const allowedSlugs = new Set(availablePlatforms.map(p => p.slug));
+  const legacySelectedSlugs = Array.from(selectedPlatforms).filter(slug => !allowedSlugs.has(slug));
 
   // Load existing content when editing
   useEffect(() => {
@@ -178,7 +138,10 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
     setError("");
     setSaving(true);
 
-    const links = Array.from(selectedPlatforms).map(slug => platformLinks[slug] ?? { slug, url: "", externalId: "", scheduledAt: "" });
+    const allowed = new Set(getPlatformsForType(contentType).map(p => p.slug));
+    const links = Array.from(selectedPlatforms)
+      .filter(slug => allowed.has(slug))
+      .map(slug => platformLinks[slug] ?? { slug, url: "", externalId: "", scheduledAt: "" });
 
     const payload = {
       type: contentType,
@@ -209,7 +172,7 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
       }
 
       await res.json();
-      router.push(episodeId ? `/episodes/${episodeId}` : `/content`);
+      router.push(episodeId ? `/content/${episodeId}` : `/content?type=${contentType}`);
       router.refresh();
     } catch {
       setError("Netzwerkfehler — bitte erneut versuchen");
@@ -466,7 +429,7 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
                             <input
                               type="url"
                               className="cms-input"
-                              placeholder={PLACEHOLDER_URL[p.slug] ?? "https://..."}
+                              placeholder={PLATFORM_PLACEHOLDER_URL[p.slug] ?? "https://..."}
                               value={link.url}
                               onChange={e => updatePlatformLink(p.slug, "url", e.target.value)}
                             />
@@ -482,7 +445,7 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
                             />
                           </div>
                         </div>
-                        {(p.slug === "youtube" || p.slug === "yt_shorts" || p.slug === "ig_reels" || p.slug === "instagram") && (
+                        {supportsAnalyticsExternalId(p.slug) && (
                           <div className="mt-2">
                             <label className="cms-label">Video/Post-ID (für Analytics-Pull)</label>
                             <input
@@ -498,6 +461,23 @@ export default function EpisodeForm({ episodeId }: EpisodeFormProps) {
                       </div>
                     );
                   })}
+              </div>
+            )}
+
+            {legacySelectedSlugs.length > 0 && (
+              <div className="flex flex-col gap-2 pt-2 border-t" style={{ borderColor: "var(--border)" }}>
+                <p className="text-xs" style={{ color: "var(--text-muted)", fontStyle: "italic", fontFamily: "var(--font-eb-garamond)" }}>
+                  Legacy-Plattformen (nur lesbar — beim Speichern entfernt)
+                </p>
+                {legacySelectedSlugs.map(slug => {
+                  const link = platformLinks[slug];
+                  return (
+                    <div key={slug} className="text-xs px-3 py-2 rounded border opacity-70" style={{ borderColor: "var(--border)", fontFamily: "var(--font-eb-garamond)" }}>
+                      <span className="cms-label">{slug}</span>
+                      {link?.url && <span className="block truncate mt-1">{link.url}</span>}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </>

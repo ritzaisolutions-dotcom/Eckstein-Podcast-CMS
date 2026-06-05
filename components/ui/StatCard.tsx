@@ -16,7 +16,7 @@ export default function StatCard({ label, value, accent }: StatCardProps) {
     >
       <div
         className="text-2xl font-medium"
-        style={{ fontFamily: "var(--font-cinzel)", color: accent ? "var(--gold)" : "var(--navy)" }}
+        style={{ fontFamily: "var(--font-cinzel)", color: accent ? "var(--gold-light)" : "var(--text-primary)" }}
       >
         {value}
       </div>

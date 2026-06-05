@@ -11,18 +11,20 @@ interface Command {
 }
 
 const COMMANDS: Command[] = [
-  { label: "Neue Episode", description: "Long-Form Content anlegen", icon: "▶", href: "/episodes/new" },
+  { label: "Neuer Content", description: "Schnell anlegen — LFC, SFC, Artikel, Post", icon: "▶", href: "/content/new" },
+  { label: "Neuer LFC", description: "Long-Form Episode", icon: "▶", href: "/content/new?type=lfc" },
+  { label: "Neuer Short", description: "SFC / Clip", icon: "▷", href: "/content/new?type=sfc" },
   { label: "Neue Idee", description: "Ideen & Topics", icon: "⊕", href: "/mind-dump/new" },
   { label: "Gast anlegen", description: "Gäste-Datenbank", icon: "◉", href: "/guests/new" },
   { label: "Vault öffnen", description: "Passwörter & Accounts", icon: "⬘", href: "/vault" },
   { label: "OHE — Dashboard", description: "Offene · Heute · Everything", icon: "◈", href: "/" },
-  { label: "Content", description: "Alle Content-Pieces", icon: "▤", href: "/content" },
+  { label: "Content Hub", description: "Board & Tabelle — alle Pieces", icon: "▤", href: "/content" },
   { label: "Analytics", description: "Views & Performance", icon: "◎", href: "/analytics" },
   { label: "Episode Prep", description: "Vorbereitung & roter Faden", icon: "◉", href: "/prep" },
-  { label: "Das Fundament", description: "Newsletter & Artikel", icon: "✦", href: "/newsletter" },
+  { label: "Das Fundament", description: "Artikel & Newsletter", icon: "✦", href: "/content?type=article" },
   { label: "Media Library", description: "Uploads & Assets", icon: "◫", href: "/media" },
   { label: "Einstellungen", description: "Checklisten & Templates", icon: "◌", href: "/settings" },
-  { label: "Episoden", description: "Long-Form übersicht", icon: "▶", href: "/episodes" },
+  { label: "Episoden", description: "Long-Form im Hub", icon: "▶", href: "/content?type=lfc" },
 ];
 
 function fuzzy(query: string, commands: Command[]) {

@@ -1,20 +1,11 @@
-import Link from "next/link";
-import PageHeader from "@/components/ui/PageHeader";
-import Button from "@/components/ui/Button";
-import EpisodeForm from "@/components/EpisodeForm";
+import { redirect } from "next/navigation";
 
-export default function NewEpisodePage() {
-  return (
-    <div className="px-4 md:px-8 py-6 max-w-3xl mx-auto">
-      <PageHeader
-        title="Neue Episode"
-        actions={
-          <Link href="/episodes">
-            <Button variant="ghost" size="sm">← Zurück</Button>
-          </Link>
-        }
-      />
-      <EpisodeForm />
-    </div>
-  );
+export default async function NewEpisodeRedirect({
+  searchParams,
+}: {
+  searchParams: Promise<{ type?: string }>;
+}) {
+  const params = await searchParams;
+  const qs = params.type ? `?type=${params.type}` : "";
+  redirect(`/content/new${qs}`);
 }
