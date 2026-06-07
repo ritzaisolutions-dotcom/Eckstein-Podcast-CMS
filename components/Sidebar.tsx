@@ -17,6 +17,7 @@ const NAV_MAIN: NavItem[] = [
   { href: "/content", label: "Content", icon: "▤", hero: true },
   { href: "/analytics", label: "Analytics", icon: "◎" },
   { href: "/prep", label: "Episode Prep", icon: "◉" },
+  { href: "/thumbnail", label: "Thumbnail", icon: "◧" },
   { href: "/content?type=article", label: "Das Fundament", icon: "✦", matchType: "article" },
   { href: "/mind-dump", label: "Ideen & Topics", icon: "⊕" },
 ];
