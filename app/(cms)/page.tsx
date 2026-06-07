@@ -1,10 +1,7 @@
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+export const maxDuration = 60;
 import Link from "next/link";
-import { getDb } from "@/lib/db";
-import { getCachedPlatforms, getCachedContentCounts, getCachedPlatformViews } from "@/lib/cache";
-import { contentPieces, contentPlatformLinks, episodeTasks, forumThreads, analyticsSnapshots } from "@/lib/db/schema";
-import { eq, and, lte, isNull, isNotNull, desc, gte, inArray, or } from "drizzle-orm";
+import { getCachedPlatforms, getCachedContentCounts, getCachedPlatformViews, getCachedDashboardWidgets } from "@/lib/cache";
 
 const WOCHENTAGE = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 const MONATE = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
@@ -33,111 +30,24 @@ function fmt(n: number) {
 }
 
 export default async function Dashboard() {
-  const db = getDb();
-  const today = new Date();
-  const todayStr = today.toISOString().split("T")[0];
-  const weekLater = new Date(today);
-  weekLater.setDate(today.getDate() + 7);
-  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-
-  // Cached aggregates first (single heavy analytics query max)
   const [
     { total: totalCount, byType: countByType },
     platformRows,
     platViews,
+    { dueTodayLinks, dueWeekLinks, recentEps, forumRecent, latestPublished, kpiSnaps },
   ] = await Promise.all([
     getCachedContentCounts(),
     getCachedPlatforms(),
     getCachedPlatformViews(),
+    getCachedDashboardWidgets(),
   ]);
 
   const platformMap = Object.fromEntries(platformRows.map(p => [p.id, p.slug]));
-
-  // Lightweight widget queries — sequential to avoid queueing 9 queries on max:1 connection
-  const dueTodayLinks = await db.select({
-      contentId: contentPlatformLinks.contentId,
-      platformId: contentPlatformLinks.platformId,
-      title: contentPieces.title,
-      episodeNumber: contentPieces.episodeNumber,
-      type: contentPieces.type,
-    })
-    .from(contentPlatformLinks)
-    .innerJoin(contentPieces, eq(contentPlatformLinks.contentId, contentPieces.id))
-    .where(and(
-      isNull(contentPlatformLinks.postedAt),
-      isNotNull(contentPlatformLinks.scheduledAt),
-      lte(contentPlatformLinks.scheduledAt, new Date(todayStr + "T23:59:59Z")),
-    ))
-    .limit(6);
-
-  const dueWeekLinks = await db.select({
-      id: contentPieces.id,
-      title: contentPieces.title,
-      episodeNumber: contentPieces.episodeNumber,
-      filmingDate: contentPieces.filmingDate,
-      lifecycleStage: contentPieces.lifecycleStage,
-      scheduledAt: contentPlatformLinks.scheduledAt,
-    })
-    .from(contentPieces)
-    .leftJoin(contentPlatformLinks, eq(contentPlatformLinks.contentId, contentPieces.id))
-    .where(or(
-      and(
-        isNull(contentPlatformLinks.postedAt),
-        isNotNull(contentPlatformLinks.scheduledAt),
-        gte(contentPlatformLinks.scheduledAt, new Date(todayStr + "T00:00:00Z")),
-        lte(contentPlatformLinks.scheduledAt, weekLater),
-      ),
-      and(
-        eq(contentPieces.lifecycleStage, "filming"),
-        isNotNull(contentPieces.filmingDate),
-        gte(contentPieces.filmingDate, new Date(todayStr + "T00:00:00Z")),
-        lte(contentPieces.filmingDate, weekLater),
-      ),
-    ))
-    .limit(6);
-
-  const recentEps = await db.select()
-    .from(contentPieces)
-    .where(eq(contentPieces.type, "lfc"))
-    .orderBy(desc(contentPieces.createdAt))
-    .limit(5);
-
-  const forumRecent = await db.select({ id: forumThreads.id, title: forumThreads.title, createdAt: forumThreads.createdAt })
-    .from(forumThreads)
-    .orderBy(desc(forumThreads.createdAt))
-    .limit(20);
-
-  const latestPublished = await db.select()
-    .from(contentPieces)
-    .where(and(eq(contentPieces.type, "lfc"), eq(contentPieces.status, "published")))
-    .orderBy(desc(contentPieces.uploadDate))
-    .limit(1);
+  const today = new Date();
 
   const recentIdeas = forumRecent.slice(0, 4);
-  const newIdeasCount = forumRecent.filter(t => t.createdAt && t.createdAt >= weekAgo).length;
-
-  // Episode tasks + KPI snaps fetched in parallel (second batch)
-  const recentEpIds = recentEps.map(e => e.id);
-  type EpisodeTask = typeof episodeTasks.$inferSelect;
-  type KpiSnap = { views: number };
-  const [allTasks, kpiSnaps] = await Promise.all([
-    recentEpIds.length > 0
-      ? db.select().from(episodeTasks).where(inArray(episodeTasks.contentId, recentEpIds))
-      : Promise.resolve([] as EpisodeTask[]),
-    latestPublished.length > 0
-      ? db.select({ views: analyticsSnapshots.views })
-          .from(analyticsSnapshots)
-          .where(eq(analyticsSnapshots.contentId, latestPublished[0].id))
-          .orderBy(desc(analyticsSnapshots.capturedAt))
-          .limit(2)
-      : Promise.resolve([] as KpiSnap[]),
-  ]);
-
-  const tasksByEp: Record<string, typeof allTasks> = {};
-  for (const t of allTasks) {
-    if (!tasksByEp[t.contentId]) tasksByEp[t.contentId] = [];
-    tasksByEp[t.contentId].push(t);
-  }
+  const weekAgoStr = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const newIdeasCount = forumRecent.filter(t => t.createdAt && String(t.createdAt) >= weekAgoStr).length;
 
   const kpiNumber = latestPublished[0]?.episodeNumber ?? null;
   const kpiViews = kpiSnaps[0]?.views ?? 0;
@@ -160,10 +70,10 @@ export default async function Dashboard() {
               {kpiNumber ? `EP.${kpiNumber}` : "Letzte Episode"} · Views
             </span>
             <div className="flex items-baseline gap-1.5 justify-end">
-              <span className="text-2xl" style={{ fontFamily: "var(--font-cinzel)", color: "var(--gold-light)" }}>{fmt(kpiViews)}</span>
-              {kpiPrevViews > 0 && (
-                <span className="text-xs" style={{ color: kpiViews >= kpiPrevViews ? "#4caf7d" : "#c0392b" }}>
-                  {kpiViews >= kpiPrevViews ? "↑" : "↓"}
+              <span className="text-2xl" style={{ fontFamily: "var(--font-cinzel)", color: "var(--gold-light)" }}>{fmt(Number(kpiViews))}</span>
+              {kpiPrevViews != null && Number(kpiPrevViews) > 0 && (
+                <span className="text-xs" style={{ color: Number(kpiViews) >= Number(kpiPrevViews) ? "#4caf7d" : "#c0392b" }}>
+                  {Number(kpiViews) >= Number(kpiPrevViews) ? "↑" : "↓"}
                 </span>
               )}
             </div>

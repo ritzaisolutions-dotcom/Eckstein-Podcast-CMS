@@ -287,3 +287,20 @@ export const vaultAuditLog = pgTable("vault_audit_log", {
   action: text("action").notNull(), // 'view' | 'reveal' | 'copy' | 'create' | 'update' | 'delete'
   at: timestamp("at").notNull().defaultNow(),
 });
+
+// ─── Analytics Latest (rollup table — one row per content+platform, upserted by cron) ──
+// Replaces DISTINCT ON queries over analytics_snapshots for fast reads.
+
+export const analyticsLatest = pgTable("analytics_latest", {
+  contentId: text("content_id").notNull(),
+  platformId: integer("platform_id").notNull(),
+  views: integer("views").default(0),
+  likes: integer("likes").default(0),
+  comments: integer("comments").default(0),
+  shares: integer("shares").default(0),
+  watchTimeSec: integer("watch_time_sec"),
+  capturedAt: timestamp("captured_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.contentId, t.platformId] }),
+}));

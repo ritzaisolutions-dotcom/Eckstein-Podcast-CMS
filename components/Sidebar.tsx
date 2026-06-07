@@ -149,8 +149,8 @@ export default function Sidebar() {
         </div>
       </aside>
 
-      <nav className="cms-glass-strong md:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around px-2 py-1 border-t border-[var(--glass-border-subtle)] rounded-none">
-        {[NAV_MAIN[0], NAV_MAIN[1], NAV_MAIN[2], NAV_MAIN[3], NAV_BOTTOM[0]].map(item => (
+      <nav className="cms-glass-strong md:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around px-1 py-1 border-t border-[var(--glass-border-subtle)] rounded-none">
+        {[NAV_MAIN[0], NAV_MAIN[1], NAV_MAIN[3], NAV_MAIN[4], NAV_BOTTOM[0]].map(item => (
           <Link
             key={item.href}
             href={item.href}

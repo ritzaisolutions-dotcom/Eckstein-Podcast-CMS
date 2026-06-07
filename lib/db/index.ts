@@ -4,12 +4,23 @@ import * as schema from "./schema";
 
 let _client: postgres.Sql | null = null;
 
-export function getDb() {
+// cfEnv is only passed when running inside Cloudflare Workers (via OpenNext).
+// On Vercel/local, call getDb() with no args and it uses process.env.DATABASE_URL.
+export function getDb(cfEnv?: { HYPERDRIVE?: { connectionString: string } }) {
+  // Cloudflare Workers path: Hyperdrive provides a proxied connection string per invocation.
+  // Do not cache the client — Hyperdrive manages the global pool.
+  if (cfEnv?.HYPERDRIVE) {
+    const client = postgres(cfEnv.HYPERDRIVE.connectionString, {
+      max: 1,
+      prepare: false,
+    });
+    return drizzle(client, { schema });
+  }
+
+  // Vercel / local path: Transaction Pooler (port 6543), max:1, prepare:false for PgBouncer
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL is not set");
   if (!_client) {
-    // Transaction pooler (port 6543) — designed for serverless, multiplexes many requests over few connections
-    // max:1 per serverless instance; prepare:false required for PgBouncer
     _client = postgres(url, {
       ssl: "require",
       max: 1,

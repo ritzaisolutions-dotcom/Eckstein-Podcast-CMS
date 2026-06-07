@@ -1,5 +1,25 @@
 import { getPlatformsForType } from "./platforms";
 import { LIFECYCLE_STAGES, lifecycleLabel } from "./lifecycle";
+import { contentPieces } from "./db/schema";
+
+/**
+ * Drizzle column projection for content list views.
+ * Excludes body_md and other large/unused columns to keep queries fast.
+ */
+export const contentListSelect = {
+  id: contentPieces.id,
+  contentId: contentPieces.contentId,
+  typeIndex: contentPieces.typeIndex,
+  type: contentPieces.type,
+  title: contentPieces.title,
+  bio: contentPieces.bio,
+  episodeNumber: contentPieces.episodeNumber,
+  status: contentPieces.status,
+  lifecycleStage: contentPieces.lifecycleStage,
+  createdAt: contentPieces.createdAt,
+  uploadDate: contentPieces.uploadDate,
+  hasPrayer: contentPieces.hasPrayer,
+} as const;
 
 export type DotState = "off" | "scheduled" | "live";
 export type HubView = "board" | "table";
@@ -88,11 +108,18 @@ export function buildPlatformDots(type: string, linksBySlug: Record<string, Plat
   }));
 }
 
+function asDate(value: Date | string | null | undefined): Date | null {
+  if (value == null) return null;
+  const d = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 export function formatScheduleLabel(linksBySlug: Record<string, PlatformLinkInfo>): string | null {
   let earliest: Date | null = null;
   for (const link of Object.values(linksBySlug)) {
-    if (link.postedAt || !link.scheduledAt) continue;
-    if (!earliest || link.scheduledAt < earliest) earliest = link.scheduledAt;
+    const scheduledAt = asDate(link.scheduledAt);
+    if (link.postedAt || !scheduledAt) continue;
+    if (!earliest || scheduledAt < earliest) earliest = scheduledAt;
   }
   if (!earliest) return null;
   return `Geplant: ${earliest.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}`;

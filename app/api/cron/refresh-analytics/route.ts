@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { inArray, lt } from "drizzle-orm";
-import { getDb, contentPlatformLinks, platforms, analyticsSnapshots } from "@/lib/db";
+import { getDb, contentPlatformLinks, platforms, analyticsSnapshots, analyticsLatest } from "@/lib/db";
 import { invalidateContentCaches } from "@/lib/cache";
 
 export const maxDuration = 60;
 
 const RETENTION_DAYS = 90;
 
-// Called by Vercel Cron: schedule in vercel.json
+// Called by Vercel Cron (vercel.json) or Cloudflare cron trigger (wrangler.jsonc)
 export async function GET(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret && req.headers.get("x-cron-secret") !== cronSecret) {
@@ -56,13 +56,27 @@ export async function GET(req: NextRequest) {
           for (const item of data.items ?? []) {
             const link = chunk.find(l => l.externalId === item.id);
             if (!link) continue;
-            await db.insert(analyticsSnapshots).values({
+            const snap = {
               contentId: link.contentId,
               platformId: link.platformId,
               views: parseInt(item.statistics.viewCount ?? "0", 10),
               likes: parseInt(item.statistics.likeCount ?? "0", 10),
               comments: parseInt(item.statistics.commentCount ?? "0", 10),
-              source: "api",
+              source: "api" as const,
+            };
+            await db.insert(analyticsSnapshots).values(snap);
+            await db.insert(analyticsLatest).values({
+              ...snap,
+              capturedAt: new Date(),
+            }).onConflictDoUpdate({
+              target: [analyticsLatest.contentId, analyticsLatest.platformId],
+              set: {
+                views: snap.views,
+                likes: snap.likes,
+                comments: snap.comments,
+                capturedAt: new Date(),
+                updatedAt: new Date(),
+              },
             });
             totalUpdated++;
           }
@@ -98,13 +112,27 @@ export async function GET(req: NextRequest) {
             const res = await fetch(`https://graph.facebook.com/v20.0/${link.externalId}?fields=like_count,comments_count,reach,impressions&access_token=${igToken}`);
             if (!res.ok) throw new Error(`IG ${link.externalId}: ${res.status}`);
             const data = await res.json() as { like_count?: number; comments_count?: number; reach?: number; impressions?: number };
-            await db.insert(analyticsSnapshots).values({
+            const snap = {
               contentId: link.contentId,
               platformId: link.platformId,
               views: data.reach ?? data.impressions ?? 0,
               likes: data.like_count ?? 0,
               comments: data.comments_count ?? 0,
-              source: "api",
+              source: "api" as const,
+            };
+            await db.insert(analyticsSnapshots).values(snap);
+            await db.insert(analyticsLatest).values({
+              ...snap,
+              capturedAt: new Date(),
+            }).onConflictDoUpdate({
+              target: [analyticsLatest.contentId, analyticsLatest.platformId],
+              set: {
+                views: snap.views,
+                likes: snap.likes,
+                comments: snap.comments,
+                capturedAt: new Date(),
+                updatedAt: new Date(),
+              },
             });
           })
         );

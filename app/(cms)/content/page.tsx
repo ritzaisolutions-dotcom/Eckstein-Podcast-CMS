@@ -15,6 +15,7 @@ import {
   buildLinksBySlug,
   buildContentDetailUrl,
   buildContentNewUrl,
+  contentListSelect,
   EMPTY_CTA_LABELS,
   defaultViewFromParam,
   type SortDir,
@@ -83,7 +84,8 @@ export default async function ContentPage({
           gte(contentPlatformLinks.scheduledAt, start),
           lte(contentPlatformLinks.scheduledAt, end),
         ),
-      );
+      )
+      .limit(500);
     dueIds = [...new Set(dueRows.map(r => r.contentId))];
     if (dueIds.length > 0) conditions.push(inArray(contentPieces.id, dueIds));
   }
@@ -92,11 +94,11 @@ export default async function ContentPage({
     ? [[], await getCachedPlatforms()] as const
     : await Promise.all([
         db
-          .select()
+          .select(contentListSelect)
           .from(contentPieces)
           .where(conditions.length > 0 ? and(...conditions) : undefined)
           .orderBy(sortOrder)
-          .limit(200),
+          .limit(100),
         getCachedPlatforms(),
       ]);
 

@@ -21,6 +21,7 @@ const COMMANDS: Command[] = [
   { label: "Content Hub", description: "Board & Tabelle — alle Pieces", icon: "▤", href: "/content" },
   { label: "Analytics", description: "Views & Performance", icon: "◎", href: "/analytics" },
   { label: "Episode Prep", description: "Vorbereitung & roter Faden", icon: "◉", href: "/prep" },
+  { label: "Thumbnail Generator", description: "YouTube-Template · 1280×720 PNG", icon: "◧", href: "/thumbnail" },
   { label: "Das Fundament", description: "Artikel & Newsletter", icon: "✦", href: "/content?type=article" },
   { label: "Media Library", description: "Uploads & Assets", icon: "◫", href: "/media" },
   { label: "Einstellungen", description: "Checklisten & Templates", icon: "◌", href: "/settings" },
