@@ -6,7 +6,7 @@ Minimal internal tool: **platform links** + **thumbnail generator**. Content man
 
 - **Framework:** Next.js 16 App Router
 - **Runtime:** Vercel
-- **Auth:** HMAC-signed cookie (`ADMIN_PASSWORD` + `SESSION_SECRET`)
+- **Auth:** none (internal tool, open access)
 - **Styling:** Tailwind + Dark Liquid Glass design tokens
 
 ## Commands
@@ -21,17 +21,13 @@ Secrets in `.env.local` (gitignored).
 
 ## Routes
 
-- `app/(auth)/login` — login
 - `app/(cms)/links` — platform quick-links (`lib/links.ts`)
 - `app/(cms)/thumbnail` — YouTube thumbnail generator (client-side PNG export)
-- `proxy.ts` — auth gate
+- `proxy.ts` — no-op pass-through (legacy matcher)
 
 ## Env
 
-```
-ADMIN_PASSWORD=...
-SESSION_SECRET=...
-```
+No required environment variables.
 
 ## Key Files
 
@@ -40,6 +36,6 @@ SESSION_SECRET=...
 | `lib/links.ts` | Platform link groups (edit until Notion migration done) |
 | `components/ThumbnailGenerator.tsx` | 1280×720 template + export |
 | `components/Sidebar.tsx` | Nav: Links, Thumbnail |
-| `proxy.ts` | Session cookie auth |
+| `proxy.ts` | Request pass-through (no auth) |
 
 Deploy: Vercel auto-deploy on `main`.

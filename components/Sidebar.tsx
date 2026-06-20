@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
   { href: "/links", label: "Links", icon: "⛓" },
@@ -42,12 +42,6 @@ function NavLink({ href, label, icon, active }: { href: string; label: string; i
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const router = useRouter();
-
-  async function handleLogout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
-  }
 
   return (
     <>
@@ -82,17 +76,6 @@ export default function Sidebar() {
             />
           ))}
         </nav>
-
-        <div className="px-2 pb-2 border-t border-[var(--glass-border-subtle)] pt-2">
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-3 px-3 py-2 rounded-sm text-sm w-full text-left cms-glass-nav-item"
-            style={{ fontFamily: "var(--font-eb-garamond)" }}
-          >
-            <span style={{ fontSize: "0.8rem", color: "rgba(245,238,216,0.3)" }}>↩</span>
-            <span style={{ color: "rgba(245,238,216,0.4)" }}>Logout</span>
-          </button>
-        </div>
       </aside>
 
       <nav className="cms-glass-strong md:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around px-2 py-1 border-t border-[var(--glass-border-subtle)] rounded-none">

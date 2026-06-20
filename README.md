@@ -9,7 +9,7 @@ pnpm install
 pnpm dev
 ```
 
-Login: `ADMIN_PASSWORD` und `SESSION_SECRET` in `.env.local`.
+Login entfällt — direkt `/links` oder `/thumbnail` öffnen.
 
 ## Seiten
 
@@ -20,9 +20,6 @@ Login: `ADMIN_PASSWORD` und `SESSION_SECRET` in `.env.local`.
 
 ## Env
 
-```
-ADMIN_PASSWORD=...
-SESSION_SECRET=...
-```
+Keine Pflicht-Variablen.
 
 Deploy: Vercel (GitHub → `main`).
