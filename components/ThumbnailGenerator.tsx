@@ -34,6 +34,7 @@ const DEFAULT: ThumbnailState = {
   gradientDepth: 52,
 };
 
+const LOGO_SRC = "/brand/logo.png";
 const EXPORT_TIMEOUT_MS = 30_000;
 const MAX_PHOTO_PX = 2560;
 const THUMB_W = 1280;
@@ -56,27 +57,6 @@ function exportErrorMessage(err: unknown): string {
   if (err instanceof Error && err.message) return err.message;
   if (typeof err === "string" && err) return err;
   return "Export fehlgeschlagen";
-}
-
-function BrandLogo({ size = 90 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 32 32"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      style={{ position: "absolute", top: 36, right: 36, opacity: 0.82 }}
-      aria-hidden
-    >
-      <polygon points="16,2 30,16 16,30 2,16" stroke="#c9a84c" strokeWidth="1.5" fill="none" />
-      <polygon points="16,7 25,16 16,25 7,16" fill="#05101f" />
-      <line x1="12" y1="12" x2="12" y2="20" stroke="#c9a84c" strokeWidth="1.5" strokeLinecap="round" />
-      <line x1="12" y1="12" x2="19" y2="12" stroke="#c9a84c" strokeWidth="1.5" strokeLinecap="round" />
-      <line x1="12" y1="16" x2="18" y2="16" stroke="#c9a84c" strokeWidth="1.25" strokeLinecap="round" />
-      <line x1="12" y1="20" x2="19" y2="20" stroke="#c9a84c" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
 }
 
 async function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
@@ -146,6 +126,7 @@ async function blobFromDataUrl(dataUrl: string): Promise<Blob> {
 
 async function captureThumbnail(el: HTMLElement, wrapEl: HTMLElement | null): Promise<Blob> {
   await waitForFonts();
+  await Promise.allSettled([preloadImage(LOGO_SRC)]);
   await nextFrame();
 
   const prev = {
@@ -450,7 +431,12 @@ export default function ThumbnailGenerator() {
                 </div>
 
                 {/* Logo — top right */}
-                <BrandLogo />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={LOGO_SRC}
+                  alt=""
+                  style={{ position: "absolute", top: 36, right: 36, width: 90, opacity: 0.82, objectFit: "contain" }}
+                />
 
                 {/* Text block — bottom center */}
                 <div style={{
