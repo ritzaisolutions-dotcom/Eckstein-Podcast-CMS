@@ -23,7 +23,6 @@ Secrets in `.env.local` (gitignored).
 
 - `app/(cms)/links` — platform quick-links (`lib/links.ts`)
 - `app/(cms)/thumbnail` — YouTube thumbnail generator (client-side PNG export)
-- `proxy.ts` — no-op pass-through (legacy matcher)
 
 ## Env
 
@@ -36,6 +35,5 @@ No required environment variables.
 | `lib/links.ts` | Platform link groups (edit until Notion migration done) |
 | `components/ThumbnailGenerator.tsx` | 1280×720 template + export |
 | `components/Sidebar.tsx` | Nav: Links, Thumbnail |
-| `proxy.ts` | Request pass-through (no auth) |
 
 Deploy: Vercel auto-deploy on `main`.
