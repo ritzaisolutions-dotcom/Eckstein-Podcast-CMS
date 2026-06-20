@@ -435,7 +435,7 @@ export default function ThumbnailGenerator() {
                 <img
                   src={LOGO_SRC}
                   alt=""
-                  style={{ position: "absolute", top: 36, right: 36, width: 90, opacity: 0.82, objectFit: "contain" }}
+                  style={{ position: "absolute", top: 36, right: 36, width: 90, height: "auto", opacity: 0.82, objectFit: "contain", zIndex: 3 }}
                 />
 
                 {/* Text block — bottom center */}
