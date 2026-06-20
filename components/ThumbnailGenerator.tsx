@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect, useCallback } from "react";
-import { toPng } from "html-to-image";
+import { toBlob } from "html-to-image";
 import PageHeader from "@/components/ui/PageHeader";
 
 /* ── Types ──────────────────────────────────────────────────── */
@@ -34,56 +34,115 @@ const DEFAULT: ThumbnailState = {
   gradientDepth: 52,
 };
 
-const LOGO_SRC = "/brand/logo.png";
+const LOGO_SRC = "/brand/logo.svg";
+const EXPORT_TIMEOUT_MS = 25_000;
+const MAX_PHOTO_PX = 2560;
 const FONT_CINZEL = "Cinzel, serif";
 const FONT_CORMORANT = "Cormorant Garamond, serif";
 const FONT_EB = "EB Garamond, serif";
 
+async function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+async function waitForFonts() {
+  await Promise.race([
+    document.fonts.ready,
+    new Promise<void>(resolve => setTimeout(resolve, 3000)),
+  ]);
+}
+
 async function preloadImage(src: string): Promise<void> {
   const img = new Image();
-  img.crossOrigin = "anonymous";
+  if (/^https?:\/\//.test(src)) img.crossOrigin = "anonymous";
   img.src = src;
   try {
     await img.decode();
   } catch {
     await new Promise<void>((resolve, reject) => {
       img.onload = () => resolve();
-      img.onerror = () => reject(new Error(`Failed to load image: ${src}`));
+      img.onerror = () => reject(new Error(`Bild konnte nicht geladen werden`));
     });
   }
 }
 
-async function dataUrlTo1280x720Blob(dataUrl: string): Promise<Blob> {
-  const img = new Image();
-  img.src = dataUrl;
-  await img.decode();
+async function readPhotoAsDataUrl(file: File): Promise<string> {
+  const bitmap = await createImageBitmap(file);
+  let { width, height } = bitmap;
+  const maxSide = Math.max(width, height);
+  if (maxSide > MAX_PHOTO_PX) {
+    const scale = MAX_PHOTO_PX / maxSide;
+    width = Math.round(width * scale);
+    height = Math.round(height * scale);
+  }
   const canvas = document.createElement("canvas");
-  canvas.width = 1280;
-  canvas.height = 720;
+  canvas.width = width;
+  canvas.height = height;
   const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Canvas not supported");
-  ctx.drawImage(img, 0, 0, 1280, 720);
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(b => (b ? resolve(b) : reject(new Error("Export failed"))), "image/png");
-  });
+  if (!ctx) throw new Error("Canvas nicht verfügbar");
+  ctx.drawImage(bitmap, 0, 0, width, height);
+  bitmap.close();
+  return canvas.toDataURL("image/jpeg", 0.92);
+}
+
+async function normalize1280x720(blob: Blob): Promise<Blob> {
+  const img = new Image();
+  img.src = URL.createObjectURL(blob);
+  try {
+    await img.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = 1280;
+    canvas.height = 720;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas nicht verfügbar");
+    ctx.drawImage(img, 0, 0, 1280, 720);
+    return await new Promise((resolve, reject) => {
+      canvas.toBlob(b => (b ? resolve(b) : reject(new Error("PNG-Export fehlgeschlagen"))), "image/png");
+    });
+  } finally {
+    URL.revokeObjectURL(img.src);
+  }
+}
+
+async function nextFrame() {
+  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
 }
 
 async function captureThumbnail(el: HTMLElement, photoUrl: string | null): Promise<Blob> {
-  await document.fonts.ready;
-  const loads = [preloadImage(LOGO_SRC)];
-  if (photoUrl) loads.push(preloadImage(photoUrl));
-  await Promise.all(loads);
+  await waitForFonts();
+  await Promise.allSettled([
+    preloadImage(LOGO_SRC),
+    photoUrl ? preloadImage(photoUrl) : Promise.resolve(),
+  ]);
 
   const prevTransform = el.style.transform;
   el.style.transform = "none";
+  await nextFrame();
+
   try {
-    const dataUrl = await toPng(el, {
-      width: 1280,
-      height: 720,
-      pixelRatio: 2,
-      cacheBust: true,
-    });
-    return dataUrlTo1280x720Blob(dataUrl);
+    const rawBlob = await withTimeout(
+      toBlob(el, {
+        width: 1280,
+        height: 720,
+        pixelRatio: 2,
+        cacheBust: false,
+      }),
+      EXPORT_TIMEOUT_MS,
+      "Export-Timeout — bitte erneut versuchen",
+    );
+    if (!rawBlob) throw new Error("Export lieferte kein Bild");
+    return normalize1280x720(rawBlob);
   } finally {
     el.style.transform = prevTransform;
   }
@@ -119,32 +178,22 @@ export default function ThumbnailGenerator() {
 
   const patch = useCallback((p: Partial<ThumbnailState>) => setS(prev => ({ ...prev, ...p })), []);
 
-  function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    patch({ photoUrl: URL.createObjectURL(file) });
-  }
-
-  /* Export: fonts + images preloaded, 2× raster then downscale to 1280×720 */
-  async function handleDownload() {
-    const el = thumbRef.current;
-    if (!el) return;
-    setExp(true);
     setExportFeedback(null);
     try {
-      const blob = await captureThumbnail(el, s.photoUrl);
-      downloadBlob(blob, `Eckstein_Ep${s.episode}_Thumbnail.png`);
+      const dataUrl = await readPhotoAsDataUrl(file);
+      patch({ photoUrl: dataUrl });
     } catch {
-      setExportFeedback("Export fehlgeschlagen");
-    } finally {
-      setExp(false);
+      setExportFeedback("Foto konnte nicht geladen werden");
     }
   }
 
-  async function handleCopy() {
+  async function runExport(action: "download" | "copy") {
     const el = thumbRef.current;
     if (!el) return;
-    if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
+    if (action === "copy" && (!navigator.clipboard?.write || typeof ClipboardItem === "undefined")) {
       setExportFeedback("Clipboard nicht verfügbar");
       return;
     }
@@ -152,14 +201,27 @@ export default function ThumbnailGenerator() {
     setExportFeedback(null);
     try {
       const blob = await captureThumbnail(el, s.photoUrl);
-      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-      setExportFeedback("Kopiert ✓");
-      setTimeout(() => setExportFeedback(null), 2500);
-    } catch {
-      setExportFeedback("Kopieren fehlgeschlagen");
+      if (action === "download") {
+        downloadBlob(blob, `Eckstein_Ep${s.episode}_Thumbnail.png`);
+      } else {
+        await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+        setExportFeedback("Kopiert ✓");
+        setTimeout(() => setExportFeedback(null), 2500);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Export fehlgeschlagen";
+      setExportFeedback(msg);
     } finally {
       setExp(false);
     }
+  }
+
+  async function handleDownload() {
+    await runExport("download");
+  }
+
+  async function handleCopy() {
+    await runExport("copy");
   }
 
   const exportActions = (
@@ -337,7 +399,7 @@ export default function ThumbnailGenerator() {
 
                 {/* Logo — top right */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/brand/logo.png" alt="" style={{ position: "absolute", top: 36, right: 36, width: 90, opacity: 0.82, objectFit: "contain" }} />
+                <img src={LOGO_SRC} alt="" style={{ position: "absolute", top: 36, right: 36, width: 90, opacity: 0.82, objectFit: "contain" }} />
 
                 {/* Text block — bottom center */}
                 <div style={{
