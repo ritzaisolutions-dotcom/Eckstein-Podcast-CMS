@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect, useCallback } from "react";
-import { toBlob } from "html-to-image";
+import { toBlob, toPng } from "html-to-image";
 import PageHeader from "@/components/ui/PageHeader";
 
 /* ── Types ──────────────────────────────────────────────────── */
@@ -34,12 +34,50 @@ const DEFAULT: ThumbnailState = {
   gradientDepth: 52,
 };
 
-const LOGO_SRC = "/brand/logo.svg";
-const EXPORT_TIMEOUT_MS = 25_000;
+const EXPORT_TIMEOUT_MS = 30_000;
 const MAX_PHOTO_PX = 2560;
+const THUMB_W = 1280;
+const THUMB_H = 720;
 const FONT_CINZEL = "Cinzel, serif";
 const FONT_CORMORANT = "Cormorant Garamond, serif";
 const FONT_EB = "EB Garamond, serif";
+
+const EXPORT_OPTS = {
+  width: THUMB_W,
+  height: THUMB_H,
+  canvasWidth: THUMB_W,
+  canvasHeight: THUMB_H,
+  pixelRatio: 1,
+  backgroundColor: "#05101f",
+  cacheBust: false,
+} as const;
+
+function exportErrorMessage(err: unknown): string {
+  if (err instanceof Error && err.message) return err.message;
+  if (typeof err === "string" && err) return err;
+  return "Export fehlgeschlagen";
+}
+
+function BrandLogo({ size = 90 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 32 32"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      style={{ position: "absolute", top: 36, right: 36, opacity: 0.82 }}
+      aria-hidden
+    >
+      <polygon points="16,2 30,16 16,30 2,16" stroke="#c9a84c" strokeWidth="1.5" fill="none" />
+      <polygon points="16,7 25,16 16,25 7,16" fill="#05101f" />
+      <line x1="12" y1="12" x2="12" y2="20" stroke="#c9a84c" strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="12" y1="12" x2="19" y2="12" stroke="#c9a84c" strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="12" y1="16" x2="18" y2="16" stroke="#c9a84c" strokeWidth="1.25" strokeLinecap="round" />
+      <line x1="12" y1="20" x2="19" y2="20" stroke="#c9a84c" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 async function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -71,12 +109,17 @@ async function preloadImage(src: string): Promise<void> {
   } catch {
     await new Promise<void>((resolve, reject) => {
       img.onload = () => resolve();
-      img.onerror = () => reject(new Error(`Bild konnte nicht geladen werden`));
+      img.onerror = () => reject(new Error("Bild konnte nicht geladen werden"));
     });
   }
 }
 
-async function readPhotoAsDataUrl(file: File): Promise<string> {
+async function nextFrame() {
+  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+}
+
+async function photoToDataUrl(file: File, brightness: number, saturation: number): Promise<string> {
   const bitmap = await createImageBitmap(file);
   let { width, height } = bitmap;
   const maxSide = Math.max(width, height);
@@ -90,61 +133,54 @@ async function readPhotoAsDataUrl(file: File): Promise<string> {
   canvas.height = height;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas nicht verfügbar");
+  ctx.filter = `brightness(${brightness / 100}) saturate(${saturation / 100})`;
   ctx.drawImage(bitmap, 0, 0, width, height);
   bitmap.close();
   return canvas.toDataURL("image/jpeg", 0.92);
 }
 
-async function normalize1280x720(blob: Blob): Promise<Blob> {
-  const img = new Image();
-  img.src = URL.createObjectURL(blob);
-  try {
-    await img.decode();
-    const canvas = document.createElement("canvas");
-    canvas.width = 1280;
-    canvas.height = 720;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("Canvas nicht verfügbar");
-    ctx.drawImage(img, 0, 0, 1280, 720);
-    return await new Promise((resolve, reject) => {
-      canvas.toBlob(b => (b ? resolve(b) : reject(new Error("PNG-Export fehlgeschlagen"))), "image/png");
-    });
-  } finally {
-    URL.revokeObjectURL(img.src);
-  }
+async function blobFromDataUrl(dataUrl: string): Promise<Blob> {
+  const res = await fetch(dataUrl);
+  return res.blob();
 }
 
-async function nextFrame() {
-  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-}
-
-async function captureThumbnail(el: HTMLElement, photoUrl: string | null): Promise<Blob> {
+async function captureThumbnail(el: HTMLElement, wrapEl: HTMLElement | null): Promise<Blob> {
   await waitForFonts();
-  await Promise.allSettled([
-    preloadImage(LOGO_SRC),
-    photoUrl ? preloadImage(photoUrl) : Promise.resolve(),
-  ]);
+  await nextFrame();
 
-  const prevTransform = el.style.transform;
+  const prev = {
+    elTransform: el.style.transform,
+    wrapOverflow: wrapEl?.style.overflow ?? "",
+  };
   el.style.transform = "none";
+  if (wrapEl) wrapEl.style.overflow = "visible";
   await nextFrame();
 
   try {
-    const rawBlob = await withTimeout(
-      toBlob(el, {
-        width: 1280,
-        height: 720,
-        pixelRatio: 2,
-        cacheBust: false,
-      }),
-      EXPORT_TIMEOUT_MS,
-      "Export-Timeout — bitte erneut versuchen",
-    );
-    if (!rawBlob) throw new Error("Export lieferte kein Bild");
-    return normalize1280x720(rawBlob);
+    const attempts = [
+      () => toBlob(el, { ...EXPORT_OPTS, skipFonts: true, type: "image/png" }),
+      () => toBlob(el, { ...EXPORT_OPTS, skipFonts: false, type: "image/png" }),
+      async () => blobFromDataUrl(await toPng(el, { ...EXPORT_OPTS, skipFonts: true })),
+    ];
+
+    let lastErr: unknown;
+    for (const attempt of attempts) {
+      try {
+        const blob = await withTimeout(
+          attempt(),
+          EXPORT_TIMEOUT_MS,
+          "Export-Timeout — bitte erneut versuchen",
+        );
+        if (blob && blob.size > 0) return blob;
+        lastErr = new Error("Export lieferte kein Bild");
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+    throw lastErr;
   } finally {
-    el.style.transform = prevTransform;
+    el.style.transform = prev.elTransform;
+    if (wrapEl) wrapEl.style.overflow = prev.wrapOverflow;
   }
 }
 
@@ -167,6 +203,9 @@ export default function ThumbnailGenerator() {
   const wrapRef     = useRef<HTMLDivElement>(null);   // outer 16:9 container
   const thumbRef    = useRef<HTMLDivElement>(null);   // actual 1280×720 element
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const photoFileRef = useRef<File | null>(null);
+
+  const patch = useCallback((p: Partial<ThumbnailState>) => setS(prev => ({ ...prev, ...p })), []);
 
   /* Responsive scale */
   useEffect(() => {
@@ -176,14 +215,28 @@ export default function ThumbnailGenerator() {
     return () => ro.disconnect();
   }, []);
 
-  const patch = useCallback((p: Partial<ThumbnailState>) => setS(prev => ({ ...prev, ...p })), []);
+  /* Re-bake photo when brightness/saturation sliders change */
+  useEffect(() => {
+    const file = photoFileRef.current;
+    if (!file) return;
+    let cancelled = false;
+    photoToDataUrl(file, s.brightness, s.saturation)
+      .then(dataUrl => {
+        if (!cancelled) patch({ photoUrl: dataUrl });
+      })
+      .catch(() => {
+        if (!cancelled) setExportFeedback("Foto konnte nicht verarbeitet werden");
+      });
+    return () => { cancelled = true; };
+  }, [s.brightness, s.saturation, patch]);
 
   async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    photoFileRef.current = file;
     setExportFeedback(null);
     try {
-      const dataUrl = await readPhotoAsDataUrl(file);
+      const dataUrl = await photoToDataUrl(file, s.brightness, s.saturation);
       patch({ photoUrl: dataUrl });
     } catch {
       setExportFeedback("Foto konnte nicht geladen werden");
@@ -200,7 +253,8 @@ export default function ThumbnailGenerator() {
     setExp(true);
     setExportFeedback(null);
     try {
-      const blob = await captureThumbnail(el, s.photoUrl);
+      if (s.photoUrl) await preloadImage(s.photoUrl);
+      const blob = await captureThumbnail(el, wrapRef.current);
       if (action === "download") {
         downloadBlob(blob, `Eckstein_Ep${s.episode}_Thumbnail.png`);
       } else {
@@ -209,8 +263,7 @@ export default function ThumbnailGenerator() {
         setTimeout(() => setExportFeedback(null), 2500);
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Export fehlgeschlagen";
-      setExportFeedback(msg);
+      setExportFeedback(exportErrorMessage(err));
     } finally {
       setExp(false);
     }
@@ -365,7 +418,6 @@ export default function ThumbnailGenerator() {
                       position: "absolute", inset: 0,
                       width: "100%", height: "100%",
                       objectFit: "cover", objectPosition: "center 15%",
-                      filter: `brightness(${s.brightness / 100}) saturate(${s.saturation / 100})`,
                     }}
                   />
                 )}
@@ -398,8 +450,7 @@ export default function ThumbnailGenerator() {
                 </div>
 
                 {/* Logo — top right */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={LOGO_SRC} alt="" style={{ position: "absolute", top: 36, right: 36, width: 90, opacity: 0.82, objectFit: "contain" }} />
+                <BrandLogo />
 
                 {/* Text block — bottom center */}
                 <div style={{
