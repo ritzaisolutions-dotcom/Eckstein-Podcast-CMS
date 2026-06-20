@@ -34,10 +34,75 @@ const DEFAULT: ThumbnailState = {
   gradientDepth: 52,
 };
 
+const LOGO_SRC = "/brand/logo.png";
+const FONT_CINZEL = "Cinzel, serif";
+const FONT_CORMORANT = "Cormorant Garamond, serif";
+const FONT_EB = "EB Garamond, serif";
+
+async function preloadImage(src: string): Promise<void> {
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.src = src;
+  try {
+    await img.decode();
+  } catch {
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error(`Failed to load image: ${src}`));
+    });
+  }
+}
+
+async function dataUrlTo1280x720Blob(dataUrl: string): Promise<Blob> {
+  const img = new Image();
+  img.src = dataUrl;
+  await img.decode();
+  const canvas = document.createElement("canvas");
+  canvas.width = 1280;
+  canvas.height = 720;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas not supported");
+  ctx.drawImage(img, 0, 0, 1280, 720);
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(b => (b ? resolve(b) : reject(new Error("Export failed"))), "image/png");
+  });
+}
+
+async function captureThumbnail(el: HTMLElement, photoUrl: string | null): Promise<Blob> {
+  await document.fonts.ready;
+  const loads = [preloadImage(LOGO_SRC)];
+  if (photoUrl) loads.push(preloadImage(photoUrl));
+  await Promise.all(loads);
+
+  const prevTransform = el.style.transform;
+  el.style.transform = "none";
+  try {
+    const dataUrl = await toPng(el, {
+      width: 1280,
+      height: 720,
+      pixelRatio: 2,
+      cacheBust: true,
+    });
+    return dataUrlTo1280x720Blob(dataUrl);
+  } finally {
+    el.style.transform = prevTransform;
+  }
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.download = filename;
+  a.href = url;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 /* ── Component ──────────────────────────────────────────────── */
 export default function ThumbnailGenerator() {
   const [s, setS]           = useState<ThumbnailState>(DEFAULT);
   const [exporting, setExp] = useState(false);
+  const [exportFeedback, setExportFeedback] = useState<string | null>(null);
   const [scale, setScale]   = useState(0.5);
 
   const wrapRef     = useRef<HTMLDivElement>(null);   // outer 16:9 container
@@ -60,24 +125,58 @@ export default function ThumbnailGenerator() {
     patch({ photoUrl: URL.createObjectURL(file) });
   }
 
-  /* Export: temporarily remove CSS transform so html-to-image captures full 1280×720 */
-  async function handleExport() {
+  /* Export: fonts + images preloaded, 2× raster then downscale to 1280×720 */
+  async function handleDownload() {
     const el = thumbRef.current;
     if (!el) return;
     setExp(true);
-    const prev = el.style.transform;
-    el.style.transform = "none";
+    setExportFeedback(null);
     try {
-      const dataUrl = await toPng(el, { width: 1280, height: 720, pixelRatio: 1 });
-      const a = document.createElement("a");
-      a.download = `Eckstein_Ep${s.episode}_Thumbnail.png`;
-      a.href = dataUrl;
-      a.click();
+      const blob = await captureThumbnail(el, s.photoUrl);
+      downloadBlob(blob, `Eckstein_Ep${s.episode}_Thumbnail.png`);
+    } catch {
+      setExportFeedback("Export fehlgeschlagen");
     } finally {
-      el.style.transform = prev;
       setExp(false);
     }
   }
+
+  async function handleCopy() {
+    const el = thumbRef.current;
+    if (!el) return;
+    if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
+      setExportFeedback("Clipboard nicht verfügbar");
+      return;
+    }
+    setExp(true);
+    setExportFeedback(null);
+    try {
+      const blob = await captureThumbnail(el, s.photoUrl);
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      setExportFeedback("Kopiert ✓");
+      setTimeout(() => setExportFeedback(null), 2500);
+    } catch {
+      setExportFeedback("Kopieren fehlgeschlagen");
+    } finally {
+      setExp(false);
+    }
+  }
+
+  const exportActions = (
+    <div className="flex items-center gap-2 flex-wrap">
+      <CmsBtn onClick={handleDownload} disabled={exporting}>
+        {exporting ? "Exportiere …" : "Download PNG"}
+      </CmsBtn>
+      <CmsBtn onClick={handleCopy} disabled={exporting} variant="secondary">
+        {exporting ? "…" : "In Zwischenablage"}
+      </CmsBtn>
+      {exportFeedback && (
+        <span className="text-xs" style={{ fontFamily: "var(--font-eb-garamond)", color: "var(--text-muted)", fontStyle: "italic" }}>
+          {exportFeedback}
+        </span>
+      )}
+    </div>
+  );
 
   /* Overlay gradient */
   const overlay = [
@@ -94,11 +193,7 @@ export default function ThumbnailGenerator() {
       <PageHeader
         title="Thumbnail Generator"
         subtitle={`Ep. ${s.episode} · 1280 × 720 px`}
-        actions={
-          <CmsBtn onClick={handleExport} disabled={exporting}>
-            {exporting ? "Exportiere …" : "Download PNG"}
-          </CmsBtn>
-        }
+        actions={exportActions}
       />
 
       <div className="flex gap-5" style={{ alignItems: "flex-start" }}>
@@ -165,9 +260,19 @@ export default function ThumbnailGenerator() {
           </div>
 
           {/* Bottom export */}
-          <CmsBtn onClick={handleExport} disabled={exporting} full>
-            {exporting ? "Exportiere …" : "↓  Download PNG · 1280 × 720"}
-          </CmsBtn>
+          <div className="flex flex-col gap-2">
+            <CmsBtn onClick={handleDownload} disabled={exporting} full>
+              {exporting ? "Exportiere …" : "↓  Download PNG · 1280 × 720"}
+            </CmsBtn>
+            <CmsBtn onClick={handleCopy} disabled={exporting} full variant="secondary">
+              In Zwischenablage kopieren
+            </CmsBtn>
+            {exportFeedback && (
+              <p className="text-xs text-center" style={{ fontFamily: "var(--font-eb-garamond)", color: "var(--text-muted)", fontStyle: "italic" }}>
+                {exportFeedback}
+              </p>
+            )}
+          </div>
         </div>
 
         {/* ── PREVIEW ──────────────────────────────────────── */}
@@ -222,7 +327,7 @@ export default function ThumbnailGenerator() {
                 {/* EP badge */}
                 <div style={{
                   position: "absolute", top: 46, left: 52,
-                  fontFamily: "var(--font-cinzel)", fontWeight: 700, fontSize: 14,
+                  fontFamily: FONT_CINZEL, fontWeight: 700, fontSize: 14,
                   letterSpacing: "0.28em", textTransform: "uppercase",
                   color: "#05101f", background: "#c9a84c",
                   padding: "4px 14px 3px", lineHeight: 1.8,
@@ -245,7 +350,7 @@ export default function ThumbnailGenerator() {
 
                   {/* Headline + keyword */}
                   <div style={{
-                    fontFamily: "var(--font-cinzel)", fontWeight: 700, fontSize: 52,
+                    fontFamily: FONT_CINZEL, fontWeight: 700, fontSize: 52,
                     lineHeight: 1.0, letterSpacing: "0.04em",
                     color: "#f5eed8", whiteSpace: "nowrap",
                     textShadow: "0 2px 24px rgba(0,0,0,1), 0 0 60px rgba(0,0,0,.95)",
@@ -263,7 +368,7 @@ export default function ThumbnailGenerator() {
 
                   {/* Subline */}
                   <div style={{
-                    fontFamily: "var(--font-cormorant)", fontStyle: "italic", fontWeight: 400, fontSize: 20,
+                    fontFamily: FONT_CORMORANT, fontStyle: "italic", fontWeight: 400, fontSize: 20,
                     color: "rgba(245,238,216,0.65)", letterSpacing: "0.05em", lineHeight: 1.4,
                     textShadow: "0 1px 14px rgba(0,0,0,.95)", marginBottom: 8,
                   }}>
@@ -272,7 +377,7 @@ export default function ThumbnailGenerator() {
 
                   {/* Branding */}
                   <div style={{
-                    fontFamily: "var(--font-eb-garamond)", fontSize: 12,
+                    fontFamily: FONT_EB, fontSize: 12,
                     letterSpacing: "0.22em", textTransform: "uppercase",
                     color: "rgba(201,168,76,0.55)",
                   }}>
@@ -325,7 +430,14 @@ function PresetBtn({ children, onClick }: { children: React.ReactNode; onClick: 
   );
 }
 
-function CmsBtn({ children, onClick, disabled, full }: { children: React.ReactNode; onClick: () => void; disabled?: boolean; full?: boolean }) {
+function CmsBtn({ children, onClick, disabled, full, variant = "primary" }: {
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  full?: boolean;
+  variant?: "primary" | "secondary";
+}) {
+  const isSecondary = variant === "secondary";
   return (
     <button
       onClick={onClick}
@@ -333,9 +445,9 @@ function CmsBtn({ children, onClick, disabled, full }: { children: React.ReactNo
       style={{
         width: full ? "100%" : undefined,
         padding: "0.45rem 1rem",
-        background: disabled ? "var(--bg-surface-2)" : "var(--navy)",
-        color: disabled ? "var(--text-muted)" : "var(--gold)",
-        border: `1px solid ${disabled ? "var(--border)" : "rgba(201,168,76,0.5)"}`,
+        background: disabled ? "var(--bg-surface-2)" : isSecondary ? "transparent" : "var(--navy)",
+        color: disabled ? "var(--text-muted)" : isSecondary ? "var(--text-secondary)" : "var(--gold)",
+        border: `1px solid ${disabled ? "var(--border)" : isSecondary ? "var(--border)" : "rgba(201,168,76,0.5)"}`,
         borderRadius: 3, cursor: disabled ? "not-allowed" : "pointer",
         fontFamily: "var(--font-cinzel)", fontWeight: 600,
         fontSize: "0.62rem", letterSpacing: "0.16em", textTransform: "uppercase",
