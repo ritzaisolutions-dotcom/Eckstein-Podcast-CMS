@@ -39,9 +39,9 @@ const EXPORT_TIMEOUT_MS = 30_000;
 const MAX_PHOTO_PX = 2560;
 const THUMB_W = 1280;
 const THUMB_H = 720;
-const FONT_CINZEL = "Cinzel, serif";
-const FONT_CORMORANT = "Cormorant Garamond, serif";
-const FONT_EB = "EB Garamond, serif";
+const FONT_CINZEL = "var(--font-cinzel), Cinzel, serif";
+const FONT_CORMORANT = "var(--font-cormorant), 'Cormorant Garamond', serif";
+const FONT_EB = "var(--font-eb-garamond), 'EB Garamond', serif";
 
 const EXPORT_OPTS = {
   width: THUMB_W,
@@ -73,10 +73,26 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, message: string):
   }
 }
 
-async function waitForFonts() {
+async function waitForFonts(root: HTMLElement) {
+  const probes: Array<{ sel: string; weight: string; size: string; style?: string }> = [
+    { sel: "[data-thumb-font='headline']", weight: "700", size: "52px" },
+    { sel: "[data-thumb-font='subline']", weight: "400", size: "20px", style: "italic" },
+    { sel: "[data-thumb-font='brand']", weight: "400", size: "12px" },
+  ];
+
+  await Promise.allSettled(
+    probes.map(async ({ sel, weight, size, style }) => {
+      const node = root.querySelector(sel);
+      if (!node) return;
+      const family = getComputedStyle(node).fontFamily;
+      const stylePart = style ? `${style} ` : "";
+      await document.fonts.load(`${stylePart}${weight} ${size} ${family}`);
+    }),
+  );
+
   await Promise.race([
     document.fonts.ready,
-    new Promise<void>(resolve => setTimeout(resolve, 3000)),
+    new Promise<void>(resolve => setTimeout(resolve, 5000)),
   ]);
 }
 
@@ -125,7 +141,7 @@ async function blobFromDataUrl(dataUrl: string): Promise<Blob> {
 }
 
 async function captureThumbnail(el: HTMLElement, wrapEl: HTMLElement | null): Promise<Blob> {
-  await waitForFonts();
+  await waitForFonts(el);
   await Promise.allSettled([preloadImage(LOGO_SRC)]);
   await nextFrame();
 
@@ -139,9 +155,9 @@ async function captureThumbnail(el: HTMLElement, wrapEl: HTMLElement | null): Pr
 
   try {
     const attempts = [
-      () => toBlob(el, { ...EXPORT_OPTS, skipFonts: true, type: "image/png" }),
       () => toBlob(el, { ...EXPORT_OPTS, skipFonts: false, type: "image/png" }),
-      async () => blobFromDataUrl(await toPng(el, { ...EXPORT_OPTS, skipFonts: true })),
+      async () => blobFromDataUrl(await toPng(el, { ...EXPORT_OPTS, skipFonts: false })),
+      () => toBlob(el, { ...EXPORT_OPTS, skipFonts: true, type: "image/png" }),
     ];
 
     let lastErr: unknown;
@@ -438,48 +454,62 @@ export default function ThumbnailGenerator() {
                   style={{ position: "absolute", top: 36, right: 36, width: 90, height: "auto", opacity: 0.82, objectFit: "contain", zIndex: 3 }}
                 />
 
-                {/* Text block — bottom center */}
+                {/* Text block — bottom center (no transform: html-to-image breaks flex + translate) */}
                 <div style={{
-                  position: "absolute", left: "50%", transform: "translateX(-50%)",
-                  bottom: 48, width: 540,
+                  position: "absolute", left: 0, right: 0, bottom: 48,
+                  width: 920, maxWidth: "100%", margin: "0 auto",
                   display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center",
+                  gap: 12, zIndex: 2,
                 }}>
                   {/* Rule */}
-                  <div style={{ width: 32, height: 1, background: "#c9a84c", opacity: 0.8, marginBottom: 10 }} />
+                  <div style={{ width: 32, height: 1, background: "#c9a84c", opacity: 0.8, flexShrink: 0 }} />
 
                   {/* Headline + keyword */}
-                  <div style={{
-                    fontFamily: FONT_CINZEL, fontWeight: 700, fontSize: 52,
-                    lineHeight: 1.0, letterSpacing: "0.04em",
-                    color: "#f5eed8", whiteSpace: "nowrap",
-                    textShadow: "0 2px 24px rgba(0,0,0,1), 0 0 60px rgba(0,0,0,.95)",
-                  }}>
+                  <div
+                    data-thumb-font="headline"
+                    style={{
+                      fontFamily: FONT_CINZEL, fontWeight: 700, fontSize: 52,
+                      lineHeight: "52px", letterSpacing: "0.04em",
+                      color: "#f5eed8", whiteSpace: "nowrap",
+                      textShadow: "0 2px 24px rgba(0,0,0,1), 0 0 60px rgba(0,0,0,.95)",
+                      flexShrink: 0,
+                    }}
+                  >
                     {s.headline}{" "}
                     <span style={{ color: "#e2c06a" }}>{s.keyword}</span>
                   </div>
 
                   {/* Diamond divider */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "12px 0 10px", width: 200 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, width: 200, flexShrink: 0 }}>
                     <div style={{ flex: 1, height: 1, background: "rgba(201,168,76,0.4)" }} />
                     <div style={{ width: 4, height: 4, background: "#c9a84c", transform: "rotate(45deg)", opacity: 0.75 }} />
                     <div style={{ flex: 1, height: 1, background: "rgba(201,168,76,0.4)" }} />
                   </div>
 
                   {/* Subline */}
-                  <div style={{
-                    fontFamily: FONT_CORMORANT, fontStyle: "italic", fontWeight: 400, fontSize: 20,
-                    color: "rgba(245,238,216,0.65)", letterSpacing: "0.05em", lineHeight: 1.4,
-                    textShadow: "0 1px 14px rgba(0,0,0,.95)", marginBottom: 8,
-                  }}>
+                  <div
+                    data-thumb-font="subline"
+                    style={{
+                      fontFamily: FONT_CORMORANT, fontStyle: "italic", fontWeight: 400, fontSize: 20,
+                      color: "rgba(245,238,216,0.65)", letterSpacing: "0.05em",
+                      lineHeight: "28px", minHeight: 56, width: "100%",
+                      textShadow: "0 1px 14px rgba(0,0,0,.95)",
+                      flexShrink: 0,
+                    }}
+                  >
                     {s.subline}
                   </div>
 
                   {/* Branding */}
-                  <div style={{
-                    fontFamily: FONT_EB, fontSize: 12,
-                    letterSpacing: "0.22em", textTransform: "uppercase",
-                    color: "rgba(201,168,76,0.55)",
-                  }}>
+                  <div
+                    data-thumb-font="brand"
+                    style={{
+                      fontFamily: FONT_EB, fontSize: 12, lineHeight: "16px",
+                      letterSpacing: "0.22em", textTransform: "uppercase",
+                      color: "rgba(201,168,76,0.55)",
+                      flexShrink: 0,
+                    }}
+                  >
                     Eckstein Podcast &nbsp;·&nbsp; Ep. {s.episode}
                   </div>
                 </div>
