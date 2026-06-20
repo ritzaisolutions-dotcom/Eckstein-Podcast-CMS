@@ -1,36 +1,28 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Eckstein Studio
 
-## Getting Started
+Schlankes internes Tool — **Plattform-Links** und **Thumbnail Generator**. Alles andere läuft über Notion.
 
-First, run the development server:
+## Schnellstart
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Login: `ADMIN_PASSWORD` und `SESSION_SECRET` in `.env.local`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Seiten
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Route | Funktion |
+|-------|----------|
+| `/links` | Plattform-Quick-Links (editierbar in `lib/links.ts`) |
+| `/thumbnail` | YouTube-Thumbnail-Template · 1280×720 PNG Export |
 
-## Learn More
+## Env
 
-To learn more about Next.js, take a look at the following resources:
+```
+ADMIN_PASSWORD=...
+SESSION_SECRET=...
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Deploy: Vercel (GitHub → `main`).

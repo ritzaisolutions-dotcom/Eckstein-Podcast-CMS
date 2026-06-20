@@ -22,7 +22,7 @@ function LoginForm() {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const from = searchParams.get("from") ?? "/";
+  const from = searchParams.get("from") ?? "/links";
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

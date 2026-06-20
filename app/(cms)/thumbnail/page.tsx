@@ -1,5 +1,3 @@
-export const dynamic = "force-dynamic";
-
 import ThumbnailGenerator from "@/components/ThumbnailGenerator";
 
 export default function ThumbnailPage() {

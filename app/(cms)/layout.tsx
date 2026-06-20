@@ -1,6 +1,3 @@
-export const dynamic = "force-dynamic";
-export const maxDuration = 60;
-
 import { Suspense } from "react";
 import Sidebar from "@/components/Sidebar";
 import CommandPalette from "@/components/CommandPalette";
