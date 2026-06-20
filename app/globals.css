@@ -33,8 +33,7 @@
   --glass-blur-strong: 20px;
   --text-on-glass: rgba(245, 238, 216, 0.92);
   --text-on-glass-muted: rgba(245, 238, 216, 0.5);
-  --cms-bg-gradient: radial-gradient(ellipse 120% 80% at 50% -20%, rgba(201, 168, 76, 0.08), transparent 55%),
-    linear-gradient(180deg, var(--navy) 0%, var(--navy-2) 45%, #040c18 100%);
+  --cms-bg-gradient: linear-gradient(180deg, var(--navy) 0%, var(--navy-2) 45%, #040c18 100%);
 }
 
 @theme inline {

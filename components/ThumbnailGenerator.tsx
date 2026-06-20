@@ -422,19 +422,6 @@ export default function ThumbnailGenerator() {
                 {/* Gradient overlay — bottom dark */}
                 <div style={{ position: "absolute", inset: 0, background: `linear-gradient(to bottom, ${overlay})` }} />
 
-                {/* Gold ray SVG */}
-                <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0.09, pointerEvents: "none" }}
-                  viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg">
-                  <g stroke="#c9a84c" strokeWidth="1.2">
-                    {([[0,0],[0,200],[0,400],[0,600],[0,720],[130,0],[130,720],[210,0],[210,720],[340,0],[340,720],[500,0],[500,720]] as [number,number][])
-                      .map(([x2,y2],i) => <line key={i} x1={210} y1={360} x2={x2} y2={y2} />)}
-                  </g>
-                </svg>
-
-                {/* Gold bars */}
-                <div style={{ position: "absolute", top: 0,    left: 0, right: 0, height: 3, background: "linear-gradient(to right,#c9a84c,#e2c06a 50%,#c9a84c)" }} />
-                <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 3, background: "linear-gradient(to right,#c9a84c,#e2c06a 50%,#c9a84c)" }} />
-
                 {/* EP badge */}
                 <div style={{
                   position: "absolute", top: 46, left: 52,
