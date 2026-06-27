@@ -295,12 +295,13 @@ function buildExportNode(
   typography: InfoboxTypography,
 ): { container: HTMLDivElement; clone: HTMLElement } {
   const exportWidth = format === "card" ? EXPORT_CARD_WIDTH : EXPORT_STRIP_WIDTH;
-  const previewWidth = source.offsetWidth || (format === "card" ? 120 : 400);
+  const previewWidth = source.getBoundingClientRect().width || source.offsetWidth || (format === "card" ? 120 : 400);
   const scale = exportWidth / previewWidth;
 
   const container = document.createElement("div");
+  // Must stay visible — html-to-image skips content inside visibility:hidden nodes
   container.style.cssText =
-    "position:fixed;left:-10000px;top:0;visibility:hidden;pointer-events:none;z-index:-1;";
+    "position:fixed;left:0;top:0;transform:translateX(-20000px);z-index:-1;pointer-events:none;overflow:visible;";
 
   const clone = source.cloneNode(true) as HTMLElement;
   clone.removeAttribute("id");
@@ -309,11 +310,16 @@ function buildExportNode(
   clone.style.maxWidth = `${exportWidth}px`;
   clone.style.boxSizing = "border-box";
   clone.style.margin = "0";
+  clone.style.opacity = "1";
+  clone.style.transform = "none";
 
   if (format === "card") {
+    clone.style.display = "block";
     clone.style.padding = `${9 * scale}px ${11 * scale}px ${10 * scale}px ${10 * scale}px`;
     clone.style.borderLeftWidth = `${3 * scale}px`;
   } else {
+    clone.style.display = "flex";
+    clone.style.alignItems = "center";
     clone.style.padding = `${9 * scale}px ${16 * scale}px ${10 * scale}px ${12 * scale}px`;
     clone.style.borderLeftWidth = `${3 * scale}px`;
     clone.style.gap = `${10 * scale}px`;
@@ -334,12 +340,16 @@ async function captureOverlay(el: HTMLElement, bgTheme: InfoboxBg): Promise<Blob
   await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
 
   const fillColor = BG_SOLID[bgTheme];
+  const rect = el.getBoundingClientRect();
   const opts = {
     backgroundColor: fillColor,
-    pixelRatio: 1,
+    pixelRatio: 2,
     skipFonts: false,
     cacheBust: true,
     type: "image/png" as const,
+    ...(rect.width > 0 && rect.height > 0
+      ? { width: Math.round(rect.width), height: Math.round(rect.height) }
+      : {}),
   };
 
   try {
@@ -379,7 +389,11 @@ async function captureForExport(
 ): Promise<Blob> {
   const { container, clone } = buildExportNode(source, format, typography);
   try {
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
     return await captureOverlay(clone, bgTheme);
+  } catch {
+    return await captureOverlay(source, bgTheme);
   } finally {
     document.body.removeChild(container);
   }
