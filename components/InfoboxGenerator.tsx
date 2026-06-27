@@ -32,6 +32,11 @@ const TYPE_SHORT: Record<InfoboxType, string> = {
 
 const EXPORT_TIMEOUT_MS = 30_000;
 
+const BG_SOLID: Record<InfoboxBg, string> = {
+  navy: "#05101f",
+  cream: "#f5eed8",
+};
+
 async function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -73,31 +78,47 @@ async function blobFromDataUrl(dataUrl: string): Promise<Blob> {
   return res.blob();
 }
 
-async function captureOverlay(el: HTMLElement): Promise<Blob> {
+async function captureOverlay(el: HTMLElement, bgTheme: InfoboxBg): Promise<Blob> {
   await waitForFonts(el);
   await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
 
-  const attempts = [
-    () => toBlob(el, { backgroundColor: "transparent", pixelRatio: 3, skipFonts: false, type: "image/png" }),
-    async () => blobFromDataUrl(await toPng(el, { backgroundColor: "transparent", pixelRatio: 3, skipFonts: false })),
-    () => toBlob(el, { backgroundColor: "transparent", pixelRatio: 3, skipFonts: true, type: "image/png" }),
-  ];
+  const prevBackground = el.style.background;
+  el.style.background = BG_SOLID[bgTheme];
+  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
 
-  let lastErr: unknown;
-  for (const attempt of attempts) {
-    try {
-      const blob = await withTimeout(
-        attempt(),
-        EXPORT_TIMEOUT_MS,
-        "Export-Timeout — bitte erneut versuchen",
-      );
-      if (blob && blob.size > 0) return blob;
-      lastErr = new Error("Export lieferte kein Bild");
-    } catch (err) {
-      lastErr = err;
+  const exportBg = BG_SOLID[bgTheme];
+  const opts = {
+    backgroundColor: exportBg,
+    pixelRatio: 3,
+    skipFonts: false,
+    type: "image/png" as const,
+  };
+
+  try {
+    const attempts = [
+      () => toBlob(el, opts),
+      async () => blobFromDataUrl(await toPng(el, opts)),
+      () => toBlob(el, { ...opts, skipFonts: true }),
+    ];
+
+    let lastErr: unknown;
+    for (const attempt of attempts) {
+      try {
+        const blob = await withTimeout(
+          attempt(),
+          EXPORT_TIMEOUT_MS,
+          "Export-Timeout — bitte erneut versuchen",
+        );
+        if (blob && blob.size > 0) return blob;
+        lastErr = new Error("Export lieferte kein Bild");
+      } catch (err) {
+        lastErr = err;
+      }
     }
+    throw lastErr;
+  } finally {
+    el.style.background = prevBackground;
   }
-  throw lastErr;
 }
 
 function downloadBlob(blob: Blob, filename: string) {
@@ -147,8 +168,8 @@ export default function InfoboxGenerator() {
     setExportFeedback(null);
 
     try {
-      const blob = await captureOverlay(el);
-      const filename = `eckstein-${format}-${typeLabel.toLowerCase()}.png`;
+      const blob = await captureOverlay(el, bgTheme);
+      const filename = `eckstein-${format}-${bgTheme}-${typeLabel.toLowerCase()}.png`;
       downloadBlob(blob, filename);
       setExportOk(true);
       setTimeout(() => setExportOk(false), 2200);
@@ -158,7 +179,7 @@ export default function InfoboxGenerator() {
     } finally {
       setExporting(false);
     }
-  }, [format, typeLabel]);
+  }, [format, bgTheme, typeLabel]);
 
   const exportActions = (
     <div className="flex items-center gap-2 flex-wrap">
@@ -189,7 +210,7 @@ export default function InfoboxGenerator() {
     <div className="px-4 md:px-6 py-6" style={{ maxWidth: 1200, margin: "0 auto" }}>
       <PageHeader
         title="Infobox Generator"
-        subtitle="CapCut-Overlays · PNG mit transparentem Hintergrund"
+        subtitle="CapCut-Overlays · PNG mit Hintergrundfarbe"
         actions={exportActions}
       />
 

@@ -245,8 +245,8 @@
 
 #ov-card.ov-theme-navy,
 #ov-strip.ov-theme-navy {
-  --ov-bg: rgba(5, 16, 31, 0.97);
-  --ov-bg-strip: linear-gradient(90deg, rgba(5, 16, 31, 0.97) 0%, rgba(5, 16, 31, 0.88) 55%, rgba(5, 16, 31, 0) 100%);
+  --ov-bg: #05101f;
+  --ov-bg-strip: linear-gradient(90deg, #05101f 0%, rgba(5, 16, 31, 0.88) 55%, rgba(5, 16, 31, 0) 100%);
   --ov-headline: #f5eed8;
   --ov-body: rgba(245, 238, 216, 0.58);
   --ov-source: rgba(201, 168, 76, 0.68);
@@ -255,8 +255,8 @@
 
 #ov-card.ov-theme-cream,
 #ov-strip.ov-theme-cream {
-  --ov-bg: rgba(245, 238, 216, 0.97);
-  --ov-bg-strip: linear-gradient(90deg, rgba(245, 238, 216, 0.97) 0%, rgba(245, 238, 216, 0.88) 55%, rgba(245, 238, 216, 0) 100%);
+  --ov-bg: #f5eed8;
+  --ov-bg-strip: linear-gradient(90deg, #f5eed8 0%, rgba(245, 238, 216, 0.88) 55%, rgba(245, 238, 216, 0) 100%);
   --ov-headline: #05101f;
   --ov-body: rgba(5, 16, 31, 0.62);
   --ov-source: rgba(8, 21, 37, 0.55);
@@ -264,7 +264,7 @@
 }
 
 #ov-card {
-  background: var(--ov-bg, rgba(5, 16, 31, 0.97));
+  background: var(--ov-bg, #05101f);
 }
 
 .ov-oct { display: flex; align-items: center; gap: 4px; margin-bottom: 4px; }
@@ -321,7 +321,7 @@
 }
 
 #ov-strip {
-  background: var(--ov-bg-strip, linear-gradient(90deg, rgba(5, 16, 31, 0.97) 0%, rgba(5, 16, 31, 0.88) 55%, rgba(5, 16, 31, 0) 100%));
+  background: var(--ov-bg-strip, linear-gradient(90deg, #05101f 0%, rgba(5, 16, 31, 0.88) 55%, rgba(5, 16, 31, 0) 100%));
   border-left: 3px solid #c9a84c;
   border-top: 1px solid rgba(201, 168, 76, 0.3);
   padding: 9px 16px 10px 12px;
