@@ -119,6 +119,31 @@ function restoreExportNode(el: HTMLElement, prev: ExportSnapshot) {
   el.className = prev.className;
 }
 
+function parseHexColor(hex: string): [number, number, number] {
+  const h = hex.replace("#", "");
+  return [
+    parseInt(h.slice(0, 2), 16),
+    parseInt(h.slice(2, 4), 16),
+    parseInt(h.slice(4, 6), 16),
+  ];
+}
+
+/** Blend every pixel onto fillColor and force alpha=255 — CapCut reads PNG alpha and shows video through. */
+function flattenAlphaOntoBackground(ctx: CanvasRenderingContext2D, fillColor: string) {
+  const [bgR, bgG, bgB] = parseHexColor(fillColor);
+  const { width, height } = ctx.canvas;
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const d = imageData.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const a = d[i + 3] / 255;
+    d[i]     = Math.round(d[i] * a + bgR * (1 - a));
+    d[i + 1] = Math.round(d[i + 1] * a + bgG * (1 - a));
+    d[i + 2] = Math.round(d[i + 2] * a + bgB * (1 - a));
+    d[i + 3] = 255;
+  }
+  ctx.putImageData(imageData, 0, 0);
+}
+
 async function flattenWithBackground(source: Blob, fillColor: string): Promise<Blob> {
   const url = URL.createObjectURL(source);
   try {
@@ -133,10 +158,13 @@ async function flattenWithBackground(source: Blob, fillColor: string): Promise<B
     ctx.fillStyle = fillColor;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0);
+    flattenAlphaOntoBackground(ctx, fillColor);
+    // JPEG has no alpha channel — CapCut cannot show video through the overlay background
     return await new Promise((resolve, reject) => {
       canvas.toBlob(
-        b => (b ? resolve(b) : reject(new Error("PNG-Export fehlgeschlagen"))),
-        "image/png",
+        b => (b ? resolve(b) : reject(new Error("Export fehlgeschlagen"))),
+        "image/jpeg",
+        0.95,
       );
     });
   } finally {
@@ -236,7 +264,7 @@ export default function InfoboxGenerator() {
 
     try {
       const blob = await captureOverlay(el, bgTheme);
-      const filename = `eckstein-${format}-${bgTheme}-${typeLabel.toLowerCase()}.png`;
+      const filename = `eckstein-${format}-${bgTheme}-${typeLabel.toLowerCase()}.jpg`;
       downloadBlob(blob, filename);
       setExportOk(true);
       setTimeout(() => setExportOk(false), 2200);
@@ -263,7 +291,7 @@ export default function InfoboxGenerator() {
           cursor: exporting ? "not-allowed" : "pointer",
         }}
       >
-        {exporting ? "Exportiere …" : "Download PNG"}
+        {exporting ? "Exportiere …" : "Download JPG"}
       </button>
       {exportFeedback && (
         <span className="text-xs italic" style={{ fontFamily: "var(--font-eb-garamond)", color: "var(--text-muted)" }}>
@@ -277,7 +305,7 @@ export default function InfoboxGenerator() {
     <div className="px-4 md:px-6 py-6" style={{ maxWidth: 1200, margin: "0 auto" }}>
       <PageHeader
         title="Infobox Generator"
-        subtitle="CapCut-Overlays · PNG mit Hintergrundfarbe"
+        subtitle="CapCut-Overlays · JPG ohne Transparenz"
         actions={exportActions}
       />
 
@@ -386,7 +414,7 @@ export default function InfoboxGenerator() {
               onClick={handleExport}
               disabled={exporting}
             >
-              {exporting ? "Exportiere…" : exportOk ? "✓ Exportiert!" : "↓ PNG Exportieren"}
+              {exporting ? "Exportiere…" : exportOk ? "✓ Exportiert!" : "↓ JPG Exportieren"}
             </button>
             <button id="ov-aniB" type="button" onClick={handleAnimate}>
               ▶ Animation
@@ -447,7 +475,7 @@ export default function InfoboxGenerator() {
           </div>
 
           <div className="ov-pvh">
-            PNG exportieren · In CapCut importieren · Größe &amp; Position frei wählen
+            JPG exportieren · In CapCut importieren · Größe &amp; Position frei wählen
           </div>
         </div>
       </div>
