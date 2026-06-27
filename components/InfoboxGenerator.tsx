@@ -7,6 +7,7 @@ import "./infobox-generator.css";
 
 type InfoboxType = "DEFINITION" | "STUDIE" | "ZITAT" | "INFO" | "LINK" | "FAKT";
 type InfoboxFormat = "card" | "strip";
+type InfoboxBg = "navy" | "cream";
 type AnimClass = "ov-a-up" | "ov-a-lft" | null;
 
 const TYPES: InfoboxType[] = ["DEFINITION", "STUDIE", "ZITAT", "INFO", "LINK", "FAKT"];
@@ -111,6 +112,7 @@ function downloadBlob(blob: Blob, filename: string) {
 export default function InfoboxGenerator() {
   const [type, setType] = useState<InfoboxType>("DEFINITION");
   const [format, setFormat] = useState<InfoboxFormat>("card");
+  const [bgTheme, setBgTheme] = useState<InfoboxBg>("navy");
   const [headline, setHeadline] = useState("");
   const [description, setDescription] = useState("");
   const [source, setSource] = useState("");
@@ -123,6 +125,7 @@ export default function InfoboxGenerator() {
   const stripRef = useRef<HTMLDivElement>(null);
 
   const typeLabel = TYPE_LABELS[type];
+  const themeClass = bgTheme === "navy" ? "ov-theme-navy" : "ov-theme-cream";
   const displayHeadline = headline.trim() || "Begriff eingeben";
   const hasDescription = description.trim().length > 0;
   const hasSource = source.trim().length > 0;
@@ -235,6 +238,26 @@ export default function InfoboxGenerator() {
               </div>
             </div>
 
+            <div className="ov-cg">
+              <label>Hintergrund</label>
+              <div className="ov-g2">
+                <button
+                  type="button"
+                  className={`ov-fb${bgTheme === "navy" ? " on" : ""}`}
+                  onClick={() => setBgTheme("navy")}
+                >
+                  Dunkelblau
+                </button>
+                <button
+                  type="button"
+                  className={`ov-fb${bgTheme === "cream" ? " on" : ""}`}
+                  onClick={() => setBgTheme("cream")}
+                >
+                  Creme
+                </button>
+              </div>
+            </div>
+
             <div className="ov-sep" />
 
             <div className="ov-cg">
@@ -292,7 +315,7 @@ export default function InfoboxGenerator() {
 
             {/* Card */}
             <div id="ov-cw" style={{ display: format === "card" ? undefined : "none" }}>
-              <div id="ov-card" ref={cardRef} className={animClass ?? undefined}>
+              <div id="ov-card" ref={cardRef} className={[animClass, themeClass].filter(Boolean).join(" ") || undefined}>
                 <div className="ov-oct">
                   <span className="ov-gem" style={{ width: 4, height: 4 }} aria-hidden="true" />
                   <span className="ov-octl">{typeLabel}</span>
@@ -313,7 +336,7 @@ export default function InfoboxGenerator() {
 
             {/* Strip */}
             <div id="ov-sw" style={{ display: format === "strip" ? undefined : "none" }}>
-              <div id="ov-strip" ref={stripRef} className={animClass ?? undefined}>
+              <div id="ov-strip" ref={stripRef} className={[animClass, themeClass].filter(Boolean).join(" ") || undefined}>
                 <div className="ov-osb">
                   <span className="ov-gem" style={{ width: 6, height: 6 }} aria-hidden="true" />
                   <div className="ov-osbl">{typeLabel}</div>
