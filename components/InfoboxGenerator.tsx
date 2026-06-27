@@ -78,18 +78,83 @@ async function blobFromDataUrl(dataUrl: string): Promise<Blob> {
   return res.blob();
 }
 
+const EXPORT_PIXEL_RATIO = 3;
+const ANIM_CLASSES = ["ov-a-up", "ov-a-lft"] as const;
+
+interface ExportSnapshot {
+  background: string;
+  backgroundColor: string;
+  backgroundImage: string;
+  opacity: string;
+  transform: string;
+  className: string;
+}
+
+function prepareExportNode(el: HTMLElement, bgTheme: InfoboxBg): ExportSnapshot {
+  const prev: ExportSnapshot = {
+    background: el.style.background,
+    backgroundColor: el.style.backgroundColor,
+    backgroundImage: el.style.backgroundImage,
+    opacity: el.style.opacity,
+    transform: el.style.transform,
+    className: el.className,
+  };
+
+  el.classList.remove(...ANIM_CLASSES);
+  el.style.backgroundColor = BG_SOLID[bgTheme];
+  el.style.backgroundImage = "none";
+  el.style.background = BG_SOLID[bgTheme];
+  el.style.opacity = "1";
+  el.style.transform = "none";
+
+  return prev;
+}
+
+function restoreExportNode(el: HTMLElement, prev: ExportSnapshot) {
+  el.style.background = prev.background;
+  el.style.backgroundColor = prev.backgroundColor;
+  el.style.backgroundImage = prev.backgroundImage;
+  el.style.opacity = prev.opacity;
+  el.style.transform = prev.transform;
+  el.className = prev.className;
+}
+
+async function flattenWithBackground(source: Blob, fillColor: string): Promise<Blob> {
+  const url = URL.createObjectURL(source);
+  try {
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas nicht verfügbar");
+    ctx.fillStyle = fillColor;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0);
+    return await new Promise((resolve, reject) => {
+      canvas.toBlob(
+        b => (b ? resolve(b) : reject(new Error("PNG-Export fehlgeschlagen"))),
+        "image/png",
+      );
+    });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 async function captureOverlay(el: HTMLElement, bgTheme: InfoboxBg): Promise<Blob> {
   await waitForFonts(el);
   await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
 
-  const prevBackground = el.style.background;
-  el.style.background = BG_SOLID[bgTheme];
+  const prev = prepareExportNode(el, bgTheme);
   await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
 
-  const exportBg = BG_SOLID[bgTheme];
+  const fillColor = BG_SOLID[bgTheme];
   const opts = {
-    backgroundColor: exportBg,
-    pixelRatio: 3,
+    backgroundColor: fillColor,
+    pixelRatio: EXPORT_PIXEL_RATIO,
     skipFonts: false,
     type: "image/png" as const,
   };
@@ -104,12 +169,14 @@ async function captureOverlay(el: HTMLElement, bgTheme: InfoboxBg): Promise<Blob
     let lastErr: unknown;
     for (const attempt of attempts) {
       try {
-        const blob = await withTimeout(
+        const rawBlob = await withTimeout(
           attempt(),
           EXPORT_TIMEOUT_MS,
           "Export-Timeout — bitte erneut versuchen",
         );
-        if (blob && blob.size > 0) return blob;
+        if (rawBlob && rawBlob.size > 0) {
+          return await flattenWithBackground(rawBlob, fillColor);
+        }
         lastErr = new Error("Export lieferte kein Bild");
       } catch (err) {
         lastErr = err;
@@ -117,7 +184,7 @@ async function captureOverlay(el: HTMLElement, bgTheme: InfoboxBg): Promise<Blob
     }
     throw lastErr;
   } finally {
-    el.style.background = prevBackground;
+    restoreExportNode(el, prev);
   }
 }
 
