@@ -1,0 +1,375 @@
+/* ── ECKSTEIN INFOBOX GENERATOR ── */
+#ov-app {
+  display: flex;
+  min-height: 520px;
+  background: #020407;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+@media (max-width: 767px) {
+  #ov-app {
+    flex-direction: column;
+    min-height: auto;
+  }
+
+  #ov-sb {
+    width: 100% !important;
+    border-right: none !important;
+    border-bottom: 1px solid rgba(201, 168, 76, 0.13);
+  }
+}
+
+#ov-sb {
+  width: 210px;
+  flex-shrink: 0;
+  background: #07111e;
+  border-right: 1px solid rgba(201, 168, 76, 0.13);
+  display: flex;
+  flex-direction: column;
+}
+
+#ov-sb-hd {
+  padding: 10px 13px;
+  border-bottom: 1px solid rgba(201, 168, 76, 0.12);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#ov-sb-title {
+  font-family: var(--font-cinzel), "Cinzel", serif;
+  font-size: 8px;
+  letter-spacing: 3px;
+  color: #c9a84c;
+  text-transform: uppercase;
+  font-weight: 400;
+}
+
+#ov-sb-bd {
+  flex: 1;
+  overflow-y: auto;
+  padding: 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+#ov-sb-bd::-webkit-scrollbar { width: 2px; }
+#ov-sb-bd::-webkit-scrollbar-thumb { background: rgba(201, 168, 76, 0.15); }
+
+#ov-sb-ft {
+  padding: 11px;
+  border-top: 1px solid rgba(201, 168, 76, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ov-cg { display: flex; flex-direction: column; gap: 3.5px; }
+
+.ov-cg > label {
+  font-family: var(--font-cinzel), "Cinzel", serif;
+  font-size: 6.5px;
+  letter-spacing: 2.5px;
+  color: rgba(201, 168, 76, 0.45);
+  text-transform: uppercase;
+}
+
+.ov-cg input,
+.ov-cg textarea {
+  background: rgba(5, 16, 31, 0.65);
+  border: 1px solid rgba(25, 45, 80, 0.7);
+  border-radius: 2px;
+  color: #f5eed8;
+  padding: 6px 8px;
+  font-family: var(--font-cormorant), "Cormorant Garamond", serif;
+  font-size: 12px;
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+}
+
+.ov-cg input:focus,
+.ov-cg textarea:focus { border-color: rgba(201, 168, 76, 0.5); }
+
+.ov-cg input::placeholder,
+.ov-cg textarea::placeholder { color: rgba(255, 255, 255, 0.18); }
+
+.ov-cg textarea { resize: none; height: 52px; line-height: 1.4; }
+
+.ov-sep { height: 1px; background: rgba(201, 168, 76, 0.08); }
+
+.ov-g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; }
+.ov-g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+
+.ov-xb,
+.ov-fb {
+  padding: 6px 2px;
+  border: 1px solid rgba(25, 45, 80, 0.7);
+  border-radius: 2px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  font-family: var(--font-cinzel), "Cinzel", serif;
+  font-size: 6px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  transition: all 0.13s;
+  text-align: center;
+}
+
+.ov-xb.on,
+.ov-fb.on {
+  border-color: #c9a84c;
+  color: #c9a84c;
+  background: rgba(201, 168, 76, 0.07);
+}
+
+.ov-xb:hover:not(.on),
+.ov-fb:hover:not(.on) {
+  color: rgba(201, 168, 76, 0.4);
+  border-color: rgba(201, 168, 76, 0.22);
+}
+
+#ov-eB {
+  padding: 10px;
+  background: #c9a84c;
+  color: #05101f;
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+  font-family: var(--font-cinzel), "Cinzel", serif;
+  font-size: 8px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  font-weight: 700;
+  transition: opacity 0.15s;
+  width: 100%;
+}
+
+#ov-eB:hover { opacity: 0.82; }
+#ov-eB:disabled { opacity: 0.4; cursor: not-allowed; }
+#ov-eB.ok { background: #2a5e43; color: #d4f0e2; }
+
+#ov-aniB {
+  padding: 7px;
+  background: transparent;
+  color: rgba(201, 168, 76, 0.4);
+  border: 1px solid rgba(201, 168, 76, 0.13);
+  border-radius: 2px;
+  cursor: pointer;
+  font-family: var(--font-cinzel), "Cinzel", serif;
+  font-size: 7.5px;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  transition: all 0.15s;
+  width: 100%;
+}
+
+#ov-aniB:hover { color: #c9a84c; border-color: rgba(201, 168, 76, 0.38); }
+
+.ov-gem {
+  display: inline-block;
+  background: #c9a84c;
+  transform: rotate(45deg);
+  flex-shrink: 0;
+  width: 5px;
+  height: 5px;
+}
+
+#ov-pv {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: #020407;
+  gap: 9px;
+  min-width: 0;
+}
+
+.ov-pvl {
+  font-family: var(--font-cinzel), "Cinzel", serif;
+  font-size: 7px;
+  letter-spacing: 3px;
+  color: rgba(255, 255, 255, 0.07);
+  text-transform: uppercase;
+}
+
+.ov-pvh {
+  font-family: var(--font-cinzel), "Cinzel", serif;
+  font-size: 6px;
+  letter-spacing: 1.8px;
+  color: rgba(201, 168, 76, 0.16);
+  text-transform: uppercase;
+  text-align: center;
+  line-height: 1.9;
+}
+
+#ov-fr {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(201, 168, 76, 0.05);
+  background: linear-gradient(148deg, #111827 0%, #07101c 55%, #030810 100%);
+}
+
+#ov-fr-wm {
+  position: absolute;
+  top: 44%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: var(--font-cinzel), "Cinzel", serif;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.025);
+  letter-spacing: 9px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+#ov-cw {
+  position: absolute;
+  bottom: 8%;
+  left: 5%;
+  width: 44%;
+}
+
+#ov-card {
+  background: rgba(5, 16, 31, 0.97);
+  border-left: 3px solid #c9a84c;
+  border-top: 1px solid rgba(201, 168, 76, 0.35);
+  padding: 9px 11px 10px 10px;
+}
+
+.ov-oct { display: flex; align-items: center; gap: 4px; margin-bottom: 4px; }
+
+.ov-octl {
+  font-family: var(--font-cinzel), "Cinzel", serif;
+  font-size: 5.5px;
+  letter-spacing: 3px;
+  color: #c9a84c;
+  text-transform: uppercase;
+}
+
+.ov-och {
+  font-family: var(--font-cinzel), "Cinzel", serif;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #f5eed8;
+  letter-spacing: 0.2px;
+  line-height: 1.2;
+  margin-bottom: 3.5px;
+}
+
+.ov-ocd {
+  font-family: var(--font-cormorant), "Cormorant Garamond", serif;
+  font-size: 10px;
+  color: rgba(245, 238, 216, 0.58);
+  line-height: 1.5;
+  font-style: italic;
+  margin-bottom: 4px;
+}
+
+.ov-ocs {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-cormorant), "Cormorant Garamond", serif;
+  font-size: 8.5px;
+  color: rgba(201, 168, 76, 0.68);
+}
+
+.ov-ocsl { width: 10px; height: 1px; background: rgba(201, 168, 76, 0.5); flex-shrink: 0; }
+
+.ov-ocbl {
+  height: 1px;
+  background: linear-gradient(90deg, rgba(201, 168, 76, 0.13), transparent 55%);
+  margin-top: 6px;
+}
+
+#ov-sw {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+}
+
+#ov-strip {
+  background: linear-gradient(90deg, rgba(5, 16, 31, 0.97) 0%, rgba(5, 16, 31, 0.88) 55%, rgba(5, 16, 31, 0) 100%);
+  border-left: 3px solid #c9a84c;
+  border-top: 1px solid rgba(201, 168, 76, 0.3);
+  padding: 9px 16px 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ov-osb { display: flex; flex-direction: column; align-items: center; gap: 3px; flex-shrink: 0; }
+
+.ov-osbl {
+  font-family: var(--font-cinzel), "Cinzel", serif;
+  font-size: 5px;
+  letter-spacing: 2.5px;
+  color: #c9a84c;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.ov-osdv {
+  width: 1px;
+  height: 28px;
+  background: linear-gradient(180deg, transparent, rgba(201, 168, 76, 0.32), transparent);
+  flex-shrink: 0;
+}
+
+.ov-osc { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+
+.ov-osh {
+  font-family: var(--font-cinzel), "Cinzel", serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: #f5eed8;
+  line-height: 1.2;
+}
+
+.ov-osd {
+  font-family: var(--font-cormorant), "Cormorant Garamond", serif;
+  font-size: 8.5px;
+  color: rgba(245, 238, 216, 0.55);
+  font-style: italic;
+  line-height: 1.35;
+}
+
+.ov-oss {
+  display: flex;
+  align-items: center;
+  gap: 3.5px;
+  font-family: var(--font-cormorant), "Cormorant Garamond", serif;
+  font-size: 7.5px;
+  color: rgba(201, 168, 76, 0.62);
+  margin-top: 1px;
+}
+
+.ov-ossd {
+  width: 3px;
+  height: 3px;
+  background: rgba(201, 168, 76, 0.6);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+@keyframes ovFadeUp {
+  from { opacity: 0; transform: translateY(9px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ovFadeLft {
+  from { opacity: 0; transform: translateX(-10px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.ov-a-up  { animation: ovFadeUp  0.32s cubic-bezier(0.21, 0.61, 0.35, 1) forwards; }
+.ov-a-lft { animation: ovFadeLft 0.32s cubic-bezier(0.21, 0.61, 0.35, 1) forwards; }

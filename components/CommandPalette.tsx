@@ -13,6 +13,7 @@ interface Command {
 const COMMANDS: Command[] = [
   { label: "Links", description: "Plattformen & Quick-Links", icon: "⛓", href: "/links" },
   { label: "Thumbnail Generator", description: "YouTube-Template · 1280×720 PNG", icon: "◧", href: "/thumbnail" },
+  { label: "Infobox Generator", description: "CapCut-Overlays · PNG transparent", icon: "◈", href: "/infobox" },
 ];
 
 function fuzzy(query: string, commands: Command[]) {

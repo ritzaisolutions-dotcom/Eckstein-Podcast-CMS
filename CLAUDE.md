@@ -1,6 +1,6 @@
 # Eckstein Studio
 
-Minimal internal tool: **platform links** + **thumbnail generator**. Content management moved to Notion.
+Minimal internal tool: **platform links**, **thumbnail generator**, and **infobox generator**. Content management moved to Notion.
 
 ## Stack
 
@@ -23,6 +23,7 @@ Secrets in `.env.local` (gitignored).
 
 - `app/(cms)/links` — platform quick-links (`lib/links.ts`)
 - `app/(cms)/thumbnail` — YouTube thumbnail generator (client-side PNG export)
+- `app/(cms)/infobox` — CapCut infobox overlays (transparent PNG export)
 
 ## Env
 
@@ -34,6 +35,7 @@ No required environment variables.
 |---|---|
 | `lib/links.ts` | Platform link groups (edit until Notion migration done) |
 | `components/ThumbnailGenerator.tsx` | 1280×720 template + export |
-| `components/Sidebar.tsx` | Nav: Links, Thumbnail |
+| `components/InfoboxGenerator.tsx` | CapCut card/strip overlays + transparent PNG export |
+| `components/Sidebar.tsx` | Nav: Links, Thumbnail, Infobox |
 
 Deploy: Vercel auto-deploy on `main`.

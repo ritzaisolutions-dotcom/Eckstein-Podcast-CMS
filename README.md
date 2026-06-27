@@ -1,6 +1,6 @@
 # Eckstein Studio
 
-Schlankes internes Tool — **Plattform-Links** und **Thumbnail Generator**. Alles andere läuft über Notion.
+Schlankes internes Tool — **Plattform-Links**, **Thumbnail Generator** und **Infobox Generator**. Alles andere läuft über Notion.
 
 ## Schnellstart
 
@@ -9,7 +9,7 @@ pnpm install
 pnpm dev
 ```
 
-Login entfällt — direkt `/links` oder `/thumbnail` öffnen.
+Login entfällt — direkt `/links`, `/thumbnail` oder `/infobox` öffnen.
 
 ## Seiten
 
@@ -17,6 +17,7 @@ Login entfällt — direkt `/links` oder `/thumbnail` öffnen.
 |-------|----------|
 | `/links` | Plattform-Quick-Links (editierbar in `lib/links.ts`) |
 | `/thumbnail` | YouTube-Thumbnail-Template · 1280×720 PNG Export |
+| `/infobox` | CapCut-Infobox-Overlays · PNG mit transparentem Hintergrund |
 
 ## Env
 

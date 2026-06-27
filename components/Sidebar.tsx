@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const NAV_ITEMS = [
   { href: "/links", label: "Links", icon: "⛓" },
   { href: "/thumbnail", label: "Thumbnail", icon: "◧" },
+  { href: "/infobox", label: "Infobox", icon: "◈" },
 ] as const;
 
 function NavLink({ href, label, icon, active }: { href: string; label: string; icon: string; active: boolean }) {
