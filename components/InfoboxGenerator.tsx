@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import { toBlob, toPng } from "html-to-image";
 import PageHeader from "@/components/ui/PageHeader";
 import "./infobox-generator.css";
@@ -9,6 +9,17 @@ type InfoboxType = "DEFINITION" | "STUDIE" | "ZITAT" | "INFO" | "LINK" | "FAKT";
 type InfoboxFormat = "card" | "strip";
 type InfoboxBg = "navy" | "cream";
 type AnimClass = "ov-a-up" | "ov-a-lft" | null;
+
+interface InfoboxTypography {
+  badgeSize: number;
+  headlineSize: number;
+  bodySize: number;
+  sourceSize: number;
+  badgeColor: string;
+  headlineColor: string;
+  bodyColor: string;
+  sourceColor: string;
+}
 
 const TYPES: InfoboxType[] = ["DEFINITION", "STUDIE", "ZITAT", "INFO", "LINK", "FAKT"];
 
@@ -30,12 +41,62 @@ const TYPE_SHORT: Record<InfoboxType, string> = {
   FAKT: "Fakt",
 };
 
+const DEFAULT_TYPOGRAPHY: InfoboxTypography = {
+  badgeSize: 5.5,
+  headlineSize: 12.5,
+  bodySize: 10,
+  sourceSize: 8.5,
+  badgeColor: "#c9a84c",
+  headlineColor: "#f5eed8",
+  bodyColor: "#c8c0a8",
+  sourceColor: "#b89950",
+};
+
 const EXPORT_TIMEOUT_MS = 30_000;
+const EXPORT_CARD_WIDTH = 720;
+const EXPORT_STRIP_WIDTH = 1920;
+const FONT_CINZEL = "Cinzel, serif";
+const FONT_CORMORANT = "Cormorant Garamond, serif";
 
 const BG_SOLID: Record<InfoboxBg, string> = {
   navy: "#05101f",
   cream: "#f5eed8",
 };
+
+function themeTypographyColors(bg: InfoboxBg): Pick<
+  InfoboxTypography,
+  "badgeColor" | "headlineColor" | "bodyColor" | "sourceColor"
+> {
+  return bg === "navy"
+    ? {
+        badgeColor: "#c9a84c",
+        headlineColor: "#f5eed8",
+        bodyColor: "#c8c0a8",
+        sourceColor: "#b89950",
+      }
+    : {
+        badgeColor: "#c9a84c",
+        headlineColor: "#05101f",
+        bodyColor: "#4a5568",
+        sourceColor: "#3d4f63",
+      };
+}
+
+function typographyCssVars(t: InfoboxTypography): React.CSSProperties {
+  return {
+    ["--ov-badge-size" as string]: `${t.badgeSize}px`,
+    ["--ov-headline-size" as string]: `${t.headlineSize}px`,
+    ["--ov-body-size" as string]: `${t.bodySize}px`,
+    ["--ov-source-size" as string]: `${t.sourceSize}px`,
+    ["--ov-badge-color" as string]: t.badgeColor,
+    ["--ov-headline-color" as string]: t.headlineColor,
+    ["--ov-body-color" as string]: t.bodyColor,
+    ["--ov-source-color" as string]: t.sourceColor,
+    ["--ov-headline" as string]: t.headlineColor,
+    ["--ov-body" as string]: t.bodyColor,
+    ["--ov-source" as string]: t.sourceColor,
+  };
+}
 
 async function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -52,16 +113,23 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, message: string):
 }
 
 async function waitForFonts(root: HTMLElement) {
-  const probes: Array<{ sel: string; weight: string; size: string; style?: string }> = [
-    { sel: "[data-ov-font='label']", weight: "600", size: "12.5px" },
-    { sel: "[data-ov-font='body']", weight: "400", size: "10px", style: "italic" },
-  ];
+  const probes: Array<{ weight: string; size: string; family: string; style?: string }> = [];
+
+  for (const sel of [".ov-octl", ".ov-osbl", "[data-ov-font='label']", "[data-ov-font='body']"]) {
+    const node = root.querySelector(sel) as HTMLElement | null;
+    if (!node) continue;
+    const cs = getComputedStyle(node);
+    const isBody = sel.includes("body") || node.classList.contains("ov-ocd") || node.classList.contains("ov-osd");
+    probes.push({
+      weight: isBody ? "400" : "600",
+      size: cs.fontSize,
+      family: cs.fontFamily,
+      style: isBody ? "italic" : undefined,
+    });
+  }
 
   await Promise.allSettled(
-    probes.map(async ({ sel, weight, size, style }) => {
-      const node = root.querySelector(sel);
-      if (!node) return;
-      const family = getComputedStyle(node).fontFamily;
+    probes.map(async ({ weight, size, family, style }) => {
       const stylePart = style ? `${style} ` : "";
       await document.fonts.load(`${stylePart}${weight} ${size} ${family}`);
     }),
@@ -78,7 +146,6 @@ async function blobFromDataUrl(dataUrl: string): Promise<Blob> {
   return res.blob();
 }
 
-const EXPORT_PIXEL_RATIO = 3;
 const ANIM_CLASSES = ["ov-a-up", "ov-a-lft"] as const;
 
 interface ExportSnapshot {
@@ -87,7 +154,8 @@ interface ExportSnapshot {
   backgroundImage: string;
   opacity: string;
   transform: string;
-  className: string;
+  hadAnimUp: boolean;
+  hadAnimLft: boolean;
 }
 
 function prepareExportNode(el: HTMLElement, bgTheme: InfoboxBg): ExportSnapshot {
@@ -97,7 +165,8 @@ function prepareExportNode(el: HTMLElement, bgTheme: InfoboxBg): ExportSnapshot 
     backgroundImage: el.style.backgroundImage,
     opacity: el.style.opacity,
     transform: el.style.transform,
-    className: el.className,
+    hadAnimUp: el.classList.contains("ov-a-up"),
+    hadAnimLft: el.classList.contains("ov-a-lft"),
   };
 
   el.classList.remove(...ANIM_CLASSES);
@@ -116,7 +185,9 @@ function restoreExportNode(el: HTMLElement, prev: ExportSnapshot) {
   el.style.backgroundImage = prev.backgroundImage;
   el.style.opacity = prev.opacity;
   el.style.transform = prev.transform;
-  el.className = prev.className;
+  el.classList.remove(...ANIM_CLASSES);
+  if (prev.hadAnimUp) el.classList.add("ov-a-up");
+  if (prev.hadAnimLft) el.classList.add("ov-a-lft");
 }
 
 function parseHexColor(hex: string): [number, number, number] {
@@ -159,7 +230,6 @@ async function flattenWithBackground(source: Blob, fillColor: string): Promise<B
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0);
     flattenAlphaOntoBackground(ctx, fillColor);
-    // JPEG has no alpha channel — CapCut cannot show video through the overlay background
     return await new Promise((resolve, reject) => {
       canvas.toBlob(
         b => (b ? resolve(b) : reject(new Error("Export fehlgeschlagen"))),
@@ -172,6 +242,90 @@ async function flattenWithBackground(source: Blob, fillColor: string): Promise<B
   }
 }
 
+function inlineExportTypography(clone: HTMLElement, typography: InfoboxTypography, scale: number) {
+  const s = (px: number) => `${px * scale}px`;
+
+  clone.style.setProperty("--ov-badge-size", s(typography.badgeSize));
+  clone.style.setProperty("--ov-headline-size", s(typography.headlineSize));
+  clone.style.setProperty("--ov-body-size", s(typography.bodySize));
+  clone.style.setProperty("--ov-source-size", s(typography.sourceSize));
+  clone.style.setProperty("--ov-badge-color", typography.badgeColor);
+  clone.style.setProperty("--ov-headline-color", typography.headlineColor);
+  clone.style.setProperty("--ov-body-color", typography.bodyColor);
+  clone.style.setProperty("--ov-source-color", typography.sourceColor);
+  clone.style.setProperty("--ov-headline", typography.headlineColor);
+  clone.style.setProperty("--ov-body", typography.bodyColor);
+  clone.style.setProperty("--ov-source", typography.sourceColor);
+
+  clone.querySelectorAll(".ov-octl, .ov-osbl").forEach(node => {
+    const el = node as HTMLElement;
+    el.style.fontFamily = FONT_CINZEL;
+    el.style.fontSize = s(typography.badgeSize);
+    el.style.color = typography.badgeColor;
+    el.style.letterSpacing = `${3 * scale}px`;
+  });
+
+  clone.querySelectorAll(".ov-och, .ov-osh, [data-ov-font='label']").forEach(node => {
+    const el = node as HTMLElement;
+    el.style.fontFamily = FONT_CINZEL;
+    el.style.fontSize = s(typography.headlineSize);
+    el.style.color = typography.headlineColor;
+    el.style.fontWeight = "600";
+  });
+
+  clone.querySelectorAll(".ov-ocd, .ov-osd, [data-ov-font='body']").forEach(node => {
+    const el = node as HTMLElement;
+    el.style.fontFamily = FONT_CORMORANT;
+    el.style.fontSize = s(typography.bodySize);
+    el.style.color = typography.bodyColor;
+    el.style.fontStyle = "italic";
+  });
+
+  clone.querySelectorAll(".ov-ocs, .ov-oss").forEach(node => {
+    const el = node as HTMLElement;
+    el.style.fontFamily = FONT_CORMORANT;
+    el.style.fontSize = s(typography.sourceSize);
+    el.style.color = typography.sourceColor;
+  });
+}
+
+function buildExportNode(
+  source: HTMLElement,
+  format: InfoboxFormat,
+  typography: InfoboxTypography,
+): { container: HTMLDivElement; clone: HTMLElement } {
+  const exportWidth = format === "card" ? EXPORT_CARD_WIDTH : EXPORT_STRIP_WIDTH;
+  const previewWidth = source.offsetWidth || (format === "card" ? 120 : 400);
+  const scale = exportWidth / previewWidth;
+
+  const container = document.createElement("div");
+  container.style.cssText =
+    "position:fixed;left:-10000px;top:0;visibility:hidden;pointer-events:none;z-index:-1;";
+
+  const clone = source.cloneNode(true) as HTMLElement;
+  clone.removeAttribute("id");
+  clone.classList.remove(...ANIM_CLASSES);
+  clone.style.width = `${exportWidth}px`;
+  clone.style.maxWidth = `${exportWidth}px`;
+  clone.style.boxSizing = "border-box";
+  clone.style.margin = "0";
+
+  if (format === "card") {
+    clone.style.padding = `${9 * scale}px ${11 * scale}px ${10 * scale}px ${10 * scale}px`;
+    clone.style.borderLeftWidth = `${3 * scale}px`;
+  } else {
+    clone.style.padding = `${9 * scale}px ${16 * scale}px ${10 * scale}px ${12 * scale}px`;
+    clone.style.borderLeftWidth = `${3 * scale}px`;
+    clone.style.gap = `${10 * scale}px`;
+  }
+
+  inlineExportTypography(clone, typography, scale);
+
+  container.appendChild(clone);
+  document.body.appendChild(container);
+  return { container, clone };
+}
+
 async function captureOverlay(el: HTMLElement, bgTheme: InfoboxBg): Promise<Blob> {
   await waitForFonts(el);
   await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
@@ -182,8 +336,9 @@ async function captureOverlay(el: HTMLElement, bgTheme: InfoboxBg): Promise<Blob
   const fillColor = BG_SOLID[bgTheme];
   const opts = {
     backgroundColor: fillColor,
-    pixelRatio: EXPORT_PIXEL_RATIO,
+    pixelRatio: 1,
     skipFonts: false,
+    cacheBust: true,
     type: "image/png" as const,
   };
 
@@ -216,6 +371,20 @@ async function captureOverlay(el: HTMLElement, bgTheme: InfoboxBg): Promise<Blob
   }
 }
 
+async function captureForExport(
+  source: HTMLElement,
+  format: InfoboxFormat,
+  bgTheme: InfoboxBg,
+  typography: InfoboxTypography,
+): Promise<Blob> {
+  const { container, clone } = buildExportNode(source, format, typography);
+  try {
+    return await captureOverlay(clone, bgTheme);
+  } finally {
+    document.body.removeChild(container);
+  }
+}
+
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -232,19 +401,52 @@ export default function InfoboxGenerator() {
   const [headline, setHeadline] = useState("");
   const [description, setDescription] = useState("");
   const [source, setSource] = useState("");
+  const [customTypeLabel, setCustomTypeLabel] = useState<string | null>(null);
+  const [typography, setTypography] = useState<InfoboxTypography>(DEFAULT_TYPOGRAPHY);
   const [exporting, setExporting] = useState(false);
   const [exportOk, setExportOk] = useState(false);
   const [exportFeedback, setExportFeedback] = useState<string | null>(null);
+  const [exportPreviewUrl, setExportPreviewUrl] = useState<string | null>(null);
   const [animClass, setAnimClass] = useState<AnimClass>(null);
 
   const cardRef = useRef<HTMLDivElement>(null);
   const stripRef = useRef<HTMLDivElement>(null);
+  const exportPreviewRef = useRef<string | null>(null);
 
-  const typeLabel = TYPE_LABELS[type];
+  const displayTypeLabel = customTypeLabel ?? TYPE_LABELS[type];
   const themeClass = bgTheme === "navy" ? "ov-theme-navy" : "ov-theme-cream";
   const displayHeadline = headline.trim() || "Begriff eingeben";
   const hasDescription = description.trim().length > 0;
   const hasSource = source.trim().length > 0;
+  const overlayStyle = typographyCssVars(typography);
+
+  useEffect(() => {
+    return () => {
+      if (exportPreviewRef.current) URL.revokeObjectURL(exportPreviewRef.current);
+    };
+  }, []);
+
+  const handleTypeChange = useCallback((t: InfoboxType) => {
+    setType(t);
+    setCustomTypeLabel(null);
+  }, []);
+
+  const handleBgThemeChange = useCallback((bg: InfoboxBg) => {
+    setBgTheme(bg);
+    setTypography(prev => ({ ...prev, ...themeTypographyColors(bg) }));
+  }, []);
+
+  const resetThemeTypography = useCallback(() => {
+    setTypography(prev => ({
+      ...prev,
+      ...themeTypographyColors(bgTheme),
+    }));
+  }, [bgTheme]);
+
+  const updateTypography = useCallback(
+    (patch: Partial<InfoboxTypography>) => setTypography(prev => ({ ...prev, ...patch })),
+    [],
+  );
 
   const handleAnimate = useCallback(() => {
     const cls: AnimClass = format === "card" ? "ov-a-up" : "ov-a-lft";
@@ -263,9 +465,17 @@ export default function InfoboxGenerator() {
     setExportFeedback(null);
 
     try {
-      const blob = await captureOverlay(el, bgTheme);
-      const filename = `eckstein-${format}-${bgTheme}-${typeLabel.toLowerCase()}.jpg`;
+      const blob = await captureForExport(el, format, bgTheme, typography);
+      const slug = displayTypeLabel.toLowerCase().replace(/\s+/g, "-");
+      const ts = Date.now();
+      const filename = `eckstein-${format}-${bgTheme}-${slug}-${ts}.jpg`;
       downloadBlob(blob, filename);
+
+      if (exportPreviewRef.current) URL.revokeObjectURL(exportPreviewRef.current);
+      const previewUrl = URL.createObjectURL(blob);
+      exportPreviewRef.current = previewUrl;
+      setExportPreviewUrl(previewUrl);
+
       setExportOk(true);
       setTimeout(() => setExportOk(false), 2200);
     } catch (err) {
@@ -274,7 +484,7 @@ export default function InfoboxGenerator() {
     } finally {
       setExporting(false);
     }
-  }, [format, bgTheme, typeLabel]);
+  }, [format, bgTheme, typography, displayTypeLabel]);
 
   const exportActions = (
     <div className="flex items-center gap-2 flex-wrap">
@@ -293,6 +503,28 @@ export default function InfoboxGenerator() {
       >
         {exporting ? "Exportiere …" : "Download JPG"}
       </button>
+      {exportPreviewUrl && (
+        <div className="flex items-center gap-2">
+          <span
+            className="text-xs uppercase tracking-widest"
+            style={{ fontFamily: "var(--font-cinzel)", color: "var(--text-muted)", fontSize: 9 }}
+          >
+            Export
+          </span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={exportPreviewUrl}
+            alt="Export-Vorschau"
+            style={{
+              height: 48,
+              borderRadius: 2,
+              border: "1px solid rgba(201,168,76,0.25)",
+              objectFit: "contain",
+              background: "#020407",
+            }}
+          />
+        </div>
+      )}
       {exportFeedback && (
         <span className="text-xs italic" style={{ fontFamily: "var(--font-eb-garamond)", color: "var(--text-muted)" }}>
           {exportFeedback}
@@ -310,7 +542,6 @@ export default function InfoboxGenerator() {
       />
 
       <div id="ov-app">
-        {/* Sidebar */}
         <div id="ov-sb">
           <div id="ov-sb-hd">
             <span className="ov-gem" aria-hidden="true" />
@@ -326,12 +557,22 @@ export default function InfoboxGenerator() {
                     key={t}
                     type="button"
                     className={`ov-xb${type === t ? " on" : ""}`}
-                    onClick={() => setType(t)}
+                    onClick={() => handleTypeChange(t)}
                   >
                     {TYPE_SHORT[t]}
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div className="ov-cg">
+              <label>Typ-Label</label>
+              <input
+                type="text"
+                value={customTypeLabel ?? TYPE_LABELS[type]}
+                onChange={e => setCustomTypeLabel(e.target.value)}
+                placeholder={TYPE_LABELS[type]}
+              />
             </div>
 
             <div className="ov-cg">
@@ -360,14 +601,14 @@ export default function InfoboxGenerator() {
                 <button
                   type="button"
                   className={`ov-fb${bgTheme === "navy" ? " on" : ""}`}
-                  onClick={() => setBgTheme("navy")}
+                  onClick={() => handleBgThemeChange("navy")}
                 >
                   Dunkelblau
                 </button>
                 <button
                   type="button"
                   className={`ov-fb${bgTheme === "cream" ? " on" : ""}`}
-                  onClick={() => setBgTheme("cream")}
+                  onClick={() => handleBgThemeChange("cream")}
                 >
                   Creme
                 </button>
@@ -404,6 +645,97 @@ export default function InfoboxGenerator() {
                 placeholder="Stanford Enc., 2023"
               />
             </div>
+
+            <div className="ov-sep" />
+
+            <div className="ov-cg">
+              <label>Typografie</label>
+              <div className="ov-typo-grid">
+                <div className="ov-typo-row">
+                  <span className="ov-typo-lbl">Badge</span>
+                  <input
+                    type="range"
+                    min={4}
+                    max={28}
+                    step={0.5}
+                    value={typography.badgeSize}
+                    onChange={e => updateTypography({ badgeSize: Number(e.target.value) })}
+                    className="ov-range"
+                  />
+                  <span className="ov-typo-val">{typography.badgeSize}px</span>
+                  <input
+                    type="color"
+                    value={typography.badgeColor}
+                    onChange={e => updateTypography({ badgeColor: e.target.value })}
+                    className="ov-color"
+                    title="Badge-Farbe"
+                  />
+                </div>
+                <div className="ov-typo-row">
+                  <span className="ov-typo-lbl">Titel</span>
+                  <input
+                    type="range"
+                    min={4}
+                    max={28}
+                    step={0.5}
+                    value={typography.headlineSize}
+                    onChange={e => updateTypography({ headlineSize: Number(e.target.value) })}
+                    className="ov-range"
+                  />
+                  <span className="ov-typo-val">{typography.headlineSize}px</span>
+                  <input
+                    type="color"
+                    value={typography.headlineColor}
+                    onChange={e => updateTypography({ headlineColor: e.target.value })}
+                    className="ov-color"
+                    title="Titel-Farbe"
+                  />
+                </div>
+                <div className="ov-typo-row">
+                  <span className="ov-typo-lbl">Text</span>
+                  <input
+                    type="range"
+                    min={4}
+                    max={28}
+                    step={0.5}
+                    value={typography.bodySize}
+                    onChange={e => updateTypography({ bodySize: Number(e.target.value) })}
+                    className="ov-range"
+                  />
+                  <span className="ov-typo-val">{typography.bodySize}px</span>
+                  <input
+                    type="color"
+                    value={typography.bodyColor}
+                    onChange={e => updateTypography({ bodyColor: e.target.value })}
+                    className="ov-color"
+                    title="Text-Farbe"
+                  />
+                </div>
+                <div className="ov-typo-row">
+                  <span className="ov-typo-lbl">Quelle</span>
+                  <input
+                    type="range"
+                    min={4}
+                    max={28}
+                    step={0.5}
+                    value={typography.sourceSize}
+                    onChange={e => updateTypography({ sourceSize: Number(e.target.value) })}
+                    className="ov-range"
+                  />
+                  <span className="ov-typo-val">{typography.sourceSize}px</span>
+                  <input
+                    type="color"
+                    value={typography.sourceColor}
+                    onChange={e => updateTypography({ sourceColor: e.target.value })}
+                    className="ov-color"
+                    title="Quellen-Farbe"
+                  />
+                </div>
+              </div>
+              <button type="button" className="ov-theme-reset" onClick={resetThemeTypography}>
+                Theme-Defaults
+              </button>
+            </div>
           </div>
 
           <div id="ov-sb-ft">
@@ -422,19 +754,22 @@ export default function InfoboxGenerator() {
           </div>
         </div>
 
-        {/* Preview */}
         <div id="ov-pv">
           <div className="ov-pvl">Vorschau — 16 : 9</div>
 
           <div id="ov-fr">
             <div id="ov-fr-wm">ECKSTEIN PODCAST</div>
 
-            {/* Card */}
             <div id="ov-cw" style={{ display: format === "card" ? undefined : "none" }}>
-              <div id="ov-card" ref={cardRef} className={[animClass, themeClass].filter(Boolean).join(" ") || undefined}>
+              <div
+                id="ov-card"
+                ref={cardRef}
+                className={[animClass, themeClass].filter(Boolean).join(" ") || undefined}
+                style={overlayStyle}
+              >
                 <div className="ov-oct">
                   <span className="ov-gem" style={{ width: 4, height: 4 }} aria-hidden="true" />
-                  <span className="ov-octl">{typeLabel}</span>
+                  <span className="ov-octl">{displayTypeLabel}</span>
                 </div>
                 <div className="ov-och" data-ov-font="label">{displayHeadline}</div>
                 {hasDescription && (
@@ -450,12 +785,16 @@ export default function InfoboxGenerator() {
               </div>
             </div>
 
-            {/* Strip */}
             <div id="ov-sw" style={{ display: format === "strip" ? undefined : "none" }}>
-              <div id="ov-strip" ref={stripRef} className={[animClass, themeClass].filter(Boolean).join(" ") || undefined}>
+              <div
+                id="ov-strip"
+                ref={stripRef}
+                className={[animClass, themeClass].filter(Boolean).join(" ") || undefined}
+                style={overlayStyle}
+              >
                 <div className="ov-osb">
                   <span className="ov-gem" style={{ width: 6, height: 6 }} aria-hidden="true" />
-                  <div className="ov-osbl">{typeLabel}</div>
+                  <div className="ov-osbl">{displayTypeLabel}</div>
                 </div>
                 <div className="ov-osdv" />
                 <div className="ov-osc">

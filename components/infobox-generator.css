@@ -21,7 +21,7 @@
 }
 
 #ov-sb {
-  width: 210px;
+  width: 240px;
   flex-shrink: 0;
   background: #07111e;
   border-right: 1px solid rgba(201, 168, 76, 0.13);
@@ -271,17 +271,17 @@
 
 .ov-octl {
   font-family: var(--font-cinzel), "Cinzel", serif;
-  font-size: 5.5px;
+  font-size: var(--ov-badge-size, 5.5px);
   letter-spacing: 3px;
-  color: #c9a84c;
+  color: var(--ov-badge-color, #c9a84c);
   text-transform: uppercase;
 }
 
 .ov-och {
   font-family: var(--font-cinzel), "Cinzel", serif;
-  font-size: 12.5px;
+  font-size: var(--ov-headline-size, 12.5px);
   font-weight: 600;
-  color: var(--ov-headline, #f5eed8);
+  color: var(--ov-headline-color, var(--ov-headline, #f5eed8));
   letter-spacing: 0.2px;
   line-height: 1.2;
   margin-bottom: 3.5px;
@@ -289,8 +289,8 @@
 
 .ov-ocd {
   font-family: var(--font-cormorant), "Cormorant Garamond", serif;
-  font-size: 10px;
-  color: var(--ov-body, rgba(245, 238, 216, 0.58));
+  font-size: var(--ov-body-size, 10px);
+  color: var(--ov-body-color, var(--ov-body, rgba(245, 238, 216, 0.58)));
   line-height: 1.5;
   font-style: italic;
   margin-bottom: 4px;
@@ -301,8 +301,8 @@
   align-items: center;
   gap: 5px;
   font-family: var(--font-cormorant), "Cormorant Garamond", serif;
-  font-size: 8.5px;
-  color: var(--ov-source, rgba(201, 168, 76, 0.68));
+  font-size: var(--ov-source-size, 8.5px);
+  color: var(--ov-source-color, var(--ov-source, rgba(201, 168, 76, 0.68)));
 }
 
 .ov-ocsl { width: 10px; height: 1px; background: rgba(201, 168, 76, 0.5); flex-shrink: 0; }
@@ -334,9 +334,9 @@
 
 .ov-osbl {
   font-family: var(--font-cinzel), "Cinzel", serif;
-  font-size: 5px;
+  font-size: var(--ov-badge-size, 5px);
   letter-spacing: 2.5px;
-  color: #c9a84c;
+  color: var(--ov-badge-color, #c9a84c);
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -352,16 +352,16 @@
 
 .ov-osh {
   font-family: var(--font-cinzel), "Cinzel", serif;
-  font-size: 11px;
+  font-size: var(--ov-headline-size, 11px);
   font-weight: 600;
-  color: var(--ov-headline, #f5eed8);
+  color: var(--ov-headline-color, var(--ov-headline, #f5eed8));
   line-height: 1.2;
 }
 
 .ov-osd {
   font-family: var(--font-cormorant), "Cormorant Garamond", serif;
-  font-size: 8.5px;
-  color: var(--ov-body, rgba(245, 238, 216, 0.55));
+  font-size: var(--ov-body-size, 8.5px);
+  color: var(--ov-body-color, var(--ov-body, rgba(245, 238, 216, 0.55)));
   font-style: italic;
   line-height: 1.35;
 }
@@ -371,9 +371,75 @@
   align-items: center;
   gap: 3.5px;
   font-family: var(--font-cormorant), "Cormorant Garamond", serif;
-  font-size: 7.5px;
-  color: var(--ov-source, rgba(201, 168, 76, 0.62));
+  font-size: var(--ov-source-size, 7.5px);
+  color: var(--ov-source-color, var(--ov-source, rgba(201, 168, 76, 0.62)));
   margin-top: 1px;
+}
+
+.ov-typo-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.ov-typo-row {
+  display: grid;
+  grid-template-columns: 28px 1fr 28px 22px;
+  align-items: center;
+  gap: 4px;
+}
+
+.ov-typo-lbl {
+  font-family: var(--font-cinzel), "Cinzel", serif;
+  font-size: 5.5px;
+  letter-spacing: 1px;
+  color: rgba(201, 168, 76, 0.4);
+  text-transform: uppercase;
+}
+
+.ov-typo-val {
+  font-family: var(--font-cormorant), "Cormorant Garamond", serif;
+  font-size: 9px;
+  color: rgba(245, 238, 216, 0.45);
+  text-align: right;
+}
+
+.ov-range {
+  width: 100%;
+  height: 3px;
+  accent-color: #c9a84c;
+  cursor: pointer;
+}
+
+.ov-color {
+  width: 22px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid rgba(25, 45, 80, 0.7);
+  border-radius: 2px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.ov-theme-reset {
+  margin-top: 4px;
+  padding: 5px 6px;
+  background: transparent;
+  border: 1px solid rgba(201, 168, 76, 0.2);
+  border-radius: 2px;
+  color: rgba(201, 168, 76, 0.55);
+  cursor: pointer;
+  font-family: var(--font-cinzel), "Cinzel", serif;
+  font-size: 6px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  width: 100%;
+  transition: all 0.13s;
+}
+
+.ov-theme-reset:hover {
+  color: #c9a84c;
+  border-color: rgba(201, 168, 76, 0.4);
 }
 
 .ov-ossd {
