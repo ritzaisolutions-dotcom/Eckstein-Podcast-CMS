@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { href: "/links", label: "Links", icon: "⛓" },
   { href: "/thumbnail", label: "Thumbnail", icon: "◧" },
   { href: "/infobox", label: "Infobox", icon: "◈" },
+  { href: "/rais-post", label: "RAIS Post", icon: "◫" },
 ] as const;
 
 function NavLink({ href, label, icon, active }: { href: string; label: string; icon: string; active: boolean }) {

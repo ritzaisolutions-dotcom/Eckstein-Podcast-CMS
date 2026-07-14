@@ -1,36 +1,30 @@
 "use client";
 
 import { useRef, useState, useCallback, useEffect } from "react";
-import { toBlob, toPng } from "html-to-image";
+import JSZip from "jszip";
 import PageHeader from "@/components/ui/PageHeader";
+import {
+  type InfoboxType,
+  type InfoboxFormat,
+  type InfoboxBg,
+  type InfoboxTypography,
+  type InfoboxItem,
+  type InfoboxPreset,
+  TYPE_LABELS,
+  DEFAULT_TYPOGRAPHY,
+  themeTypographyColors,
+  typographyCssVars,
+  resolveTypography,
+  captureForExport,
+  captureInfoboxItem,
+  downloadBlob,
+} from "@/lib/infobox-export";
+import { INFOBOX_PRESETS } from "@/lib/presets/index";
 import "./infobox-generator.css";
 
-type InfoboxType = "DEFINITION" | "STUDIE" | "ZITAT" | "INFO" | "LINK" | "FAKT";
-type InfoboxFormat = "card" | "strip";
-type InfoboxBg = "navy" | "cream";
 type AnimClass = "ov-a-up" | "ov-a-lft" | null;
 
-interface InfoboxTypography {
-  badgeSize: number;
-  headlineSize: number;
-  bodySize: number;
-  sourceSize: number;
-  badgeColor: string;
-  headlineColor: string;
-  bodyColor: string;
-  sourceColor: string;
-}
-
 const TYPES: InfoboxType[] = ["DEFINITION", "STUDIE", "ZITAT", "INFO", "LINK", "FAKT"];
-
-const TYPE_LABELS: Record<InfoboxType, string> = {
-  DEFINITION: "Definition",
-  STUDIE: "Studie",
-  ZITAT: "Zitat",
-  INFO: "Info",
-  LINK: "Link",
-  FAKT: "Fakt",
-};
 
 const TYPE_SHORT: Record<InfoboxType, string> = {
   DEFINITION: "Defin.",
@@ -41,371 +35,24 @@ const TYPE_SHORT: Record<InfoboxType, string> = {
   FAKT: "Fakt",
 };
 
-const DEFAULT_TYPOGRAPHY: InfoboxTypography = {
-  badgeSize: 5.5,
-  headlineSize: 12.5,
-  bodySize: 10,
-  sourceSize: 8.5,
-  badgeColor: "#c9a84c",
-  headlineColor: "#f5eed8",
-  bodyColor: "#c8c0a8",
-  sourceColor: "#b89950",
-};
-
-const EXPORT_TIMEOUT_MS = 30_000;
-const EXPORT_CARD_WIDTH = 720;
-const EXPORT_STRIP_WIDTH = 1920;
-const FONT_CINZEL = "Cinzel, serif";
-const FONT_CORMORANT = "Cormorant Garamond, serif";
-
-const BG_SOLID: Record<InfoboxBg, string> = {
-  navy: "#05101f",
-  cream: "#f5eed8",
-};
-
-function themeTypographyColors(bg: InfoboxBg): Pick<
-  InfoboxTypography,
-  "badgeColor" | "headlineColor" | "bodyColor" | "sourceColor"
-> {
-  return bg === "navy"
-    ? {
-        badgeColor: "#c9a84c",
-        headlineColor: "#f5eed8",
-        bodyColor: "#c8c0a8",
-        sourceColor: "#b89950",
-      }
-    : {
-        badgeColor: "#c9a84c",
-        headlineColor: "#05101f",
-        bodyColor: "#4a5568",
-        sourceColor: "#3d4f63",
-      };
-}
-
-function typographyCssVars(t: InfoboxTypography): React.CSSProperties {
-  return {
-    ["--ov-badge-size" as string]: `${t.badgeSize}px`,
-    ["--ov-headline-size" as string]: `${t.headlineSize}px`,
-    ["--ov-body-size" as string]: `${t.bodySize}px`,
-    ["--ov-source-size" as string]: `${t.sourceSize}px`,
-    ["--ov-badge-color" as string]: t.badgeColor,
-    ["--ov-headline-color" as string]: t.headlineColor,
-    ["--ov-body-color" as string]: t.bodyColor,
-    ["--ov-source-color" as string]: t.sourceColor,
-    ["--ov-headline" as string]: t.headlineColor,
-    ["--ov-body" as string]: t.bodyColor,
-    ["--ov-source" as string]: t.sourceColor,
-  };
-}
-
-async function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<T>((_, reject) => {
-        timer = setTimeout(() => reject(new Error(message)), ms);
-      }),
-    ]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
-}
-
-async function waitForFonts(root: HTMLElement) {
-  const probes: Array<{ weight: string; size: string; family: string; style?: string }> = [];
-
-  for (const sel of [".ov-octl", ".ov-osbl", "[data-ov-font='label']", "[data-ov-font='body']"]) {
-    const node = root.querySelector(sel) as HTMLElement | null;
-    if (!node) continue;
-    const cs = getComputedStyle(node);
-    const isBody = sel.includes("body") || node.classList.contains("ov-ocd") || node.classList.contains("ov-osd");
-    probes.push({
-      weight: isBody ? "400" : "600",
-      size: cs.fontSize,
-      family: cs.fontFamily,
-      style: isBody ? "italic" : undefined,
-    });
-  }
-
-  await Promise.allSettled(
-    probes.map(async ({ weight, size, family, style }) => {
-      const stylePart = style ? `${style} ` : "";
-      await document.fonts.load(`${stylePart}${weight} ${size} ${family}`);
-    }),
-  );
-
-  await Promise.race([
-    document.fonts.ready,
-    new Promise<void>(resolve => setTimeout(resolve, 5000)),
-  ]);
-}
-
-async function blobFromDataUrl(dataUrl: string): Promise<Blob> {
-  const res = await fetch(dataUrl);
-  return res.blob();
-}
-
-const ANIM_CLASSES = ["ov-a-up", "ov-a-lft"] as const;
-
-interface ExportSnapshot {
-  background: string;
-  backgroundColor: string;
-  backgroundImage: string;
-  opacity: string;
-  transform: string;
-  hadAnimUp: boolean;
-  hadAnimLft: boolean;
-}
-
-function prepareExportNode(el: HTMLElement, bgTheme: InfoboxBg): ExportSnapshot {
-  const prev: ExportSnapshot = {
-    background: el.style.background,
-    backgroundColor: el.style.backgroundColor,
-    backgroundImage: el.style.backgroundImage,
-    opacity: el.style.opacity,
-    transform: el.style.transform,
-    hadAnimUp: el.classList.contains("ov-a-up"),
-    hadAnimLft: el.classList.contains("ov-a-lft"),
-  };
-
-  el.classList.remove(...ANIM_CLASSES);
-  el.style.backgroundColor = BG_SOLID[bgTheme];
-  el.style.backgroundImage = "none";
-  el.style.background = BG_SOLID[bgTheme];
-  el.style.opacity = "1";
-  el.style.transform = "none";
-
-  return prev;
-}
-
-function restoreExportNode(el: HTMLElement, prev: ExportSnapshot) {
-  el.style.background = prev.background;
-  el.style.backgroundColor = prev.backgroundColor;
-  el.style.backgroundImage = prev.backgroundImage;
-  el.style.opacity = prev.opacity;
-  el.style.transform = prev.transform;
-  el.classList.remove(...ANIM_CLASSES);
-  if (prev.hadAnimUp) el.classList.add("ov-a-up");
-  if (prev.hadAnimLft) el.classList.add("ov-a-lft");
-}
-
-function parseHexColor(hex: string): [number, number, number] {
-  const h = hex.replace("#", "");
-  return [
-    parseInt(h.slice(0, 2), 16),
-    parseInt(h.slice(2, 4), 16),
-    parseInt(h.slice(4, 6), 16),
-  ];
-}
-
-/** Blend every pixel onto fillColor and force alpha=255 — CapCut reads PNG alpha and shows video through. */
-function flattenAlphaOntoBackground(ctx: CanvasRenderingContext2D, fillColor: string) {
-  const [bgR, bgG, bgB] = parseHexColor(fillColor);
-  const { width, height } = ctx.canvas;
-  const imageData = ctx.getImageData(0, 0, width, height);
-  const d = imageData.data;
-  for (let i = 0; i < d.length; i += 4) {
-    const a = d[i + 3] / 255;
-    d[i]     = Math.round(d[i] * a + bgR * (1 - a));
-    d[i + 1] = Math.round(d[i + 1] * a + bgG * (1 - a));
-    d[i + 2] = Math.round(d[i + 2] * a + bgB * (1 - a));
-    d[i + 3] = 255;
-  }
-  ctx.putImageData(imageData, 0, 0);
-}
-
-async function flattenWithBackground(source: Blob, fillColor: string): Promise<Blob> {
-  const url = URL.createObjectURL(source);
-  try {
-    const img = new Image();
-    img.src = url;
-    await img.decode();
-    const canvas = document.createElement("canvas");
-    canvas.width = img.width;
-    canvas.height = img.height;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("Canvas nicht verfügbar");
-    ctx.fillStyle = fillColor;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0);
-    flattenAlphaOntoBackground(ctx, fillColor);
-    return await new Promise((resolve, reject) => {
-      canvas.toBlob(
-        b => (b ? resolve(b) : reject(new Error("Export fehlgeschlagen"))),
-        "image/jpeg",
-        0.95,
-      );
-    });
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-
-function inlineExportTypography(clone: HTMLElement, typography: InfoboxTypography, scale: number) {
-  const s = (px: number) => `${px * scale}px`;
-
-  clone.style.setProperty("--ov-badge-size", s(typography.badgeSize));
-  clone.style.setProperty("--ov-headline-size", s(typography.headlineSize));
-  clone.style.setProperty("--ov-body-size", s(typography.bodySize));
-  clone.style.setProperty("--ov-source-size", s(typography.sourceSize));
-  clone.style.setProperty("--ov-badge-color", typography.badgeColor);
-  clone.style.setProperty("--ov-headline-color", typography.headlineColor);
-  clone.style.setProperty("--ov-body-color", typography.bodyColor);
-  clone.style.setProperty("--ov-source-color", typography.sourceColor);
-  clone.style.setProperty("--ov-headline", typography.headlineColor);
-  clone.style.setProperty("--ov-body", typography.bodyColor);
-  clone.style.setProperty("--ov-source", typography.sourceColor);
-
-  clone.querySelectorAll(".ov-octl, .ov-osbl").forEach(node => {
-    const el = node as HTMLElement;
-    el.style.fontFamily = FONT_CINZEL;
-    el.style.fontSize = s(typography.badgeSize);
-    el.style.color = typography.badgeColor;
-    el.style.letterSpacing = `${3 * scale}px`;
-  });
-
-  clone.querySelectorAll(".ov-och, .ov-osh, [data-ov-font='label']").forEach(node => {
-    const el = node as HTMLElement;
-    el.style.fontFamily = FONT_CINZEL;
-    el.style.fontSize = s(typography.headlineSize);
-    el.style.color = typography.headlineColor;
-    el.style.fontWeight = "600";
-  });
-
-  clone.querySelectorAll(".ov-ocd, .ov-osd, [data-ov-font='body']").forEach(node => {
-    const el = node as HTMLElement;
-    el.style.fontFamily = FONT_CORMORANT;
-    el.style.fontSize = s(typography.bodySize);
-    el.style.color = typography.bodyColor;
-    el.style.fontStyle = "italic";
-  });
-
-  clone.querySelectorAll(".ov-ocs, .ov-oss").forEach(node => {
-    const el = node as HTMLElement;
-    el.style.fontFamily = FONT_CORMORANT;
-    el.style.fontSize = s(typography.sourceSize);
-    el.style.color = typography.sourceColor;
-  });
-}
-
-function buildExportNode(
-  source: HTMLElement,
-  format: InfoboxFormat,
-  typography: InfoboxTypography,
-): { container: HTMLDivElement; clone: HTMLElement } {
-  const exportWidth = format === "card" ? EXPORT_CARD_WIDTH : EXPORT_STRIP_WIDTH;
-  const previewWidth = source.getBoundingClientRect().width || source.offsetWidth || (format === "card" ? 120 : 400);
-  const scale = exportWidth / previewWidth;
-
-  const container = document.createElement("div");
-  // Must stay visible — html-to-image skips content inside visibility:hidden nodes
-  container.style.cssText =
-    "position:fixed;left:0;top:0;transform:translateX(-20000px);z-index:-1;pointer-events:none;overflow:visible;";
-
-  const clone = source.cloneNode(true) as HTMLElement;
-  clone.removeAttribute("id");
-  clone.classList.remove(...ANIM_CLASSES);
-  clone.style.width = `${exportWidth}px`;
-  clone.style.maxWidth = `${exportWidth}px`;
-  clone.style.boxSizing = "border-box";
-  clone.style.margin = "0";
-  clone.style.opacity = "1";
-  clone.style.transform = "none";
-
-  if (format === "card") {
-    clone.style.display = "block";
-    clone.style.padding = `${9 * scale}px ${11 * scale}px ${10 * scale}px ${10 * scale}px`;
-    clone.style.borderLeftWidth = `${3 * scale}px`;
-  } else {
-    clone.style.display = "flex";
-    clone.style.alignItems = "center";
-    clone.style.padding = `${9 * scale}px ${16 * scale}px ${10 * scale}px ${12 * scale}px`;
-    clone.style.borderLeftWidth = `${3 * scale}px`;
-    clone.style.gap = `${10 * scale}px`;
-  }
-
-  inlineExportTypography(clone, typography, scale);
-
-  container.appendChild(clone);
-  document.body.appendChild(container);
-  return { container, clone };
-}
-
-async function captureOverlay(el: HTMLElement, bgTheme: InfoboxBg): Promise<Blob> {
-  await waitForFonts(el);
-  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-
-  const prev = prepareExportNode(el, bgTheme);
-  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-
-  const fillColor = BG_SOLID[bgTheme];
-  const rect = el.getBoundingClientRect();
-  const opts = {
-    backgroundColor: fillColor,
-    pixelRatio: 2,
-    skipFonts: false,
-    cacheBust: true,
-    type: "image/png" as const,
-    ...(rect.width > 0 && rect.height > 0
-      ? { width: Math.round(rect.width), height: Math.round(rect.height) }
-      : {}),
-  };
-
-  try {
-    const attempts = [
-      () => toBlob(el, opts),
-      async () => blobFromDataUrl(await toPng(el, opts)),
-      () => toBlob(el, { ...opts, skipFonts: true }),
-    ];
-
-    let lastErr: unknown;
-    for (const attempt of attempts) {
-      try {
-        const rawBlob = await withTimeout(
-          attempt(),
-          EXPORT_TIMEOUT_MS,
-          "Export-Timeout — bitte erneut versuchen",
-        );
-        if (rawBlob && rawBlob.size > 0) {
-          return await flattenWithBackground(rawBlob, fillColor);
-        }
-        lastErr = new Error("Export lieferte kein Bild");
-      } catch (err) {
-        lastErr = err;
-      }
-    }
-    throw lastErr;
-  } finally {
-    restoreExportNode(el, prev);
-  }
-}
-
-async function captureForExport(
-  source: HTMLElement,
-  format: InfoboxFormat,
-  bgTheme: InfoboxBg,
-  typography: InfoboxTypography,
-): Promise<Blob> {
-  const { container, clone } = buildExportNode(source, format, typography);
-  try {
-    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-    return await captureOverlay(clone, bgTheme);
-  } catch {
-    return await captureOverlay(source, bgTheme);
-  } finally {
-    document.body.removeChild(container);
-  }
-}
-
-function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.download = filename;
-  a.href = url;
-  a.click();
-  URL.revokeObjectURL(url);
+function applyItemToForm(item: InfoboxItem, setters: {
+  setType: (t: InfoboxType) => void;
+  setFormat: (f: InfoboxFormat) => void;
+  setBgTheme: (b: InfoboxBg) => void;
+  setHeadline: (h: string) => void;
+  setDescription: (d: string) => void;
+  setSource: (s: string) => void;
+  setCustomTypeLabel: (l: string | null) => void;
+  setTypography: (t: InfoboxTypography) => void;
+}) {
+  setters.setType(item.type);
+  setters.setFormat(item.format);
+  setters.setBgTheme(item.bgTheme);
+  setters.setHeadline(item.headline);
+  setters.setDescription(item.description);
+  setters.setSource(item.source);
+  setters.setCustomTypeLabel(item.customTypeLabel ?? null);
+  setters.setTypography(resolveTypography(item));
 }
 
 export default function InfoboxGenerator() {
@@ -423,6 +70,11 @@ export default function InfoboxGenerator() {
   const [exportPreviewUrl, setExportPreviewUrl] = useState<string | null>(null);
   const [animClass, setAnimClass] = useState<AnimClass>(null);
 
+  const [activePreset, setActivePreset] = useState<InfoboxPreset | null>(null);
+  const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
+  const [batchExporting, setBatchExporting] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<string | null>(null);
+
   const cardRef = useRef<HTMLDivElement>(null);
   const stripRef = useRef<HTMLDivElement>(null);
   const exportPreviewRef = useRef<string | null>(null);
@@ -434,6 +86,17 @@ export default function InfoboxGenerator() {
   const hasSource = source.trim().length > 0;
   const overlayStyle = typographyCssVars(typography);
 
+  const formSetters = {
+    setType,
+    setFormat,
+    setBgTheme,
+    setHeadline,
+    setDescription,
+    setSource,
+    setCustomTypeLabel,
+    setTypography,
+  };
+
   useEffect(() => {
     return () => {
       if (exportPreviewRef.current) URL.revokeObjectURL(exportPreviewRef.current);
@@ -443,6 +106,8 @@ export default function InfoboxGenerator() {
   const handleTypeChange = useCallback((t: InfoboxType) => {
     setType(t);
     setCustomTypeLabel(null);
+    setActivePreset(null);
+    setSelectedBatchId(null);
   }, []);
 
   const handleBgThemeChange = useCallback((bg: InfoboxBg) => {
@@ -500,12 +165,57 @@ export default function InfoboxGenerator() {
     }
   }, [format, bgTheme, typography, displayTypeLabel]);
 
+  const loadPreset = useCallback((preset: InfoboxPreset) => {
+    setActivePreset(preset);
+    const first = preset.items[0];
+    if (first) {
+      applyItemToForm(first, formSetters);
+      setSelectedBatchId(first.id);
+    }
+  }, [formSetters]);
+
+  const selectBatchItem = useCallback((item: InfoboxItem) => {
+    applyItemToForm(item, formSetters);
+    setSelectedBatchId(item.id);
+  }, [formSetters]);
+
+  const handleBatchExport = useCallback(async () => {
+    if (!activePreset) return;
+
+    setBatchExporting(true);
+    setBatchProgress(null);
+    setExportFeedback(null);
+
+    try {
+      const zip = new JSZip();
+      const total = activePreset.items.length;
+
+      for (let i = 0; i < total; i++) {
+        const item = activePreset.items[i];
+        setBatchProgress(`${i + 1} / ${total}`);
+        const blob = await captureInfoboxItem(item);
+        zip.file(item.exportFilename, blob);
+      }
+
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      downloadBlob(zipBlob, activePreset.zipFilename);
+      setBatchProgress(`✓ ${total} exportiert`);
+      setTimeout(() => setBatchProgress(null), 3000);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Batch-Export fehlgeschlagen";
+      setExportFeedback(msg);
+      setBatchProgress(null);
+    } finally {
+      setBatchExporting(false);
+    }
+  }, [activePreset]);
+
   const exportActions = (
     <div className="flex items-center gap-2 flex-wrap">
       <button
         type="button"
         onClick={handleExport}
-        disabled={exporting}
+        disabled={exporting || batchExporting}
         className="px-4 py-2 rounded-sm text-xs uppercase tracking-widest font-semibold transition-opacity disabled:opacity-40"
         style={{
           fontFamily: "var(--font-cinzel)",
@@ -563,6 +273,49 @@ export default function InfoboxGenerator() {
           </div>
 
           <div id="ov-sb-bd">
+            <div className="ov-cg">
+              <label>Serie</label>
+              {INFOBOX_PRESETS.map(preset => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  className={`ov-fb${activePreset?.id === preset.id ? " on" : ""}`}
+                  style={{ width: "100%", marginBottom: 4 }}
+                  onClick={() => loadPreset(preset)}
+                >
+                  {preset.label}
+                </button>
+              ))}
+              {activePreset && (
+                <>
+                  <div className="ov-batch-list">
+                    {activePreset.items.map(item => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className={`ov-batch-item${selectedBatchId === item.id ? " on" : ""}`}
+                        onClick={() => selectBatchItem(item)}
+                      >
+                        <span className="ov-batch-item-ref">{item.headline}</span>
+                        <span className="ov-batch-item-preview">{item.description}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    id="ov-batchB"
+                    type="button"
+                    onClick={handleBatchExport}
+                    disabled={batchExporting || exporting}
+                  >
+                    {batchExporting ? "Exportiere Serie …" : "Alle exportieren (ZIP)"}
+                  </button>
+                  {batchProgress && <div className="ov-batch-progress">{batchProgress}</div>}
+                </>
+              )}
+            </div>
+
+            <div className="ov-sep" />
+
             <div className="ov-cg">
               <label>Typ</label>
               <div className="ov-g3">
@@ -636,7 +389,11 @@ export default function InfoboxGenerator() {
               <input
                 type="text"
                 value={headline}
-                onChange={e => setHeadline(e.target.value)}
+                onChange={e => {
+                  setHeadline(e.target.value);
+                  setActivePreset(null);
+                  setSelectedBatchId(null);
+                }}
                 placeholder="z.B. Gerechtigkeit"
               />
             </div>
@@ -645,7 +402,11 @@ export default function InfoboxGenerator() {
               <label>Beschreibung</label>
               <textarea
                 value={description}
-                onChange={e => setDescription(e.target.value)}
+                onChange={e => {
+                  setDescription(e.target.value);
+                  setActivePreset(null);
+                  setSelectedBatchId(null);
+                }}
                 placeholder="Definition, Kernaussage, Zitat…"
               />
             </div>
@@ -655,7 +416,11 @@ export default function InfoboxGenerator() {
               <input
                 type="text"
                 value={source}
-                onChange={e => setSource(e.target.value)}
+                onChange={e => {
+                  setSource(e.target.value);
+                  setActivePreset(null);
+                  setSelectedBatchId(null);
+                }}
                 placeholder="Stanford Enc., 2023"
               />
             </div>
@@ -758,7 +523,7 @@ export default function InfoboxGenerator() {
               type="button"
               className={exportOk ? "ok" : undefined}
               onClick={handleExport}
-              disabled={exporting}
+              disabled={exporting || batchExporting}
             >
               {exporting ? "Exportiere…" : exportOk ? "✓ Exportiert!" : "↓ JPG Exportieren"}
             </button>

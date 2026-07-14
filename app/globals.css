@@ -34,6 +34,16 @@
   --text-on-glass: rgba(245, 238, 216, 0.92);
   --text-on-glass-muted: rgba(245, 238, 216, 0.5);
   --cms-bg-gradient: linear-gradient(180deg, var(--navy) 0%, var(--navy-2) 45%, #040c18 100%);
+
+  /* RAIS brand (Post generator) */
+  --rais-cloud: #F5F2EC;
+  --rais-linen: #FBF8F3;
+  --rais-orange: #EC6A37;
+  --rais-sage: #789464;
+  --rais-pistachio: #3C5A2A;
+  --rais-charcoal: #2F2A24;
+  --rais-stone: #7B746B;
+  --rais-border: #D9D1C7;
 }
 
 @theme inline {
