@@ -6,6 +6,7 @@ import PageHeader from "@/components/ui/PageHeader";
 
 /* ── Types ──────────────────────────────────────────────────── */
 type ThumbLayout = "split" | "zahl" | "face-keyword" | "vorher-nachher" | "statement";
+type VnBackground = "off-white" | "dark-grey" | "auto";
 
 interface KRThumbState {
   layout: ThumbLayout;
@@ -15,6 +16,7 @@ interface KRThumbState {
   numberContext: string;
   photoUrl: string | null;
   photoUrl2: string | null;
+  vnBackground: VnBackground;
 }
 
 const LAYOUT_LABELS: Record<ThumbLayout, string> = {
@@ -41,6 +43,13 @@ const DEFAULT: KRThumbState = {
   numberContext: "in 90 Tagen",
   photoUrl: null,
   photoUrl2: null,
+  vnBackground: "auto",
+};
+
+const VN_BG_LABELS: Record<VnBackground, string> = {
+  "off-white": "Hell",
+  "dark-grey": "Dunkel",
+  auto: "Auto",
 };
 
 const WORDMARK_SRC = "/brand/kevin-ritz-wordmark.png";
@@ -49,6 +58,7 @@ const MAX_PHOTO_PX = 2560;
 const THUMB_W = 1280;
 const THUMB_H = 720;
 const EDGE_MARGIN = 128;
+const SAFE_BR = { x: 1067, y: 600, w: 213, h: 120 } as const;
 const CONTENT_W = 853;
 const SPLIT_HALF = THUMB_W / 2;
 const PANEL_W = Math.round(THUMB_W * 0.4);
@@ -67,7 +77,7 @@ const C = {
   offWhite: "#F2F1ED",
 } as const;
 
-function exportBg(layout: ThumbLayout): string {
+function exportBg(layout: ThumbLayout, vnResolvedBg?: string): string {
   switch (layout) {
     case "split":
     case "face-keyword":
@@ -76,11 +86,57 @@ function exportBg(layout: ThumbLayout): string {
     case "statement":
       return C.racingGreen;
     case "vorher-nachher":
-      return C.offWhite;
+      return vnResolvedBg ?? C.offWhite;
     default: {
       const _exhaustive: never = layout;
       return _exhaustive;
     }
+  }
+}
+
+function isDarkVnBg(bg: string): boolean {
+  return bg === C.darkGrey;
+}
+
+async function sampleImageBrightness(dataUrl: string): Promise<number> {
+  const img = new Image();
+  img.src = dataUrl;
+  try {
+    await img.decode();
+  } catch {
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error("Brightness sample failed"));
+    });
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = 32;
+  canvas.height = 32;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return 0.5;
+  ctx.drawImage(img, 0, 0, 32, 32);
+  const data = ctx.getImageData(0, 0, 32, 32).data;
+  let sum = 0;
+  const pixels = data.length / 4;
+  for (let i = 0; i < data.length; i += 4) {
+    sum += (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) / 255;
+  }
+  return sum / pixels;
+}
+
+async function resolveVnBackground(s: KRThumbState): Promise<string> {
+  if (s.vnBackground === "off-white") return C.offWhite;
+  if (s.vnBackground === "dark-grey") return C.darkGrey;
+
+  const urls = [s.photoUrl, s.photoUrl2].filter((u): u is string => !!u);
+  if (urls.length === 0) return C.offWhite;
+
+  try {
+    const samples = await Promise.all(urls.map(sampleImageBrightness));
+    const avg = samples.reduce((a, b) => a + b, 0) / samples.length;
+    return avg < 0.35 ? C.offWhite : C.darkGrey;
+  } catch {
+    return C.offWhite;
   }
 }
 
@@ -185,12 +241,15 @@ async function captureThumbnail(
   await Promise.allSettled([preloadImage(WORDMARK_SRC)]);
   await nextFrame();
 
+  const hideNodes = Array.from(el.querySelectorAll<HTMLElement>('[data-export-hide="true"]'));
   const prev = {
     elTransform: el.style.transform,
     wrapOverflow: wrapEl?.style.overflow ?? "",
+    hideVisibility: hideNodes.map(n => n.style.visibility),
   };
   el.style.transform = "none";
   if (wrapEl) wrapEl.style.overflow = "visible";
+  hideNodes.forEach(n => { n.style.visibility = "hidden"; });
   await nextFrame();
 
   const exportOpts = {
@@ -228,6 +287,7 @@ async function captureThumbnail(
   } finally {
     el.style.transform = prev.elTransform;
     if (wrapEl) wrapEl.style.overflow = prev.wrapOverflow;
+    hideNodes.forEach((n, i) => { n.style.visibility = prev.hideVisibility[i]; });
   }
 }
 
@@ -269,6 +329,41 @@ function KevinRitzWordmark() {
       onError={() => setFailed(true)}
       style={{ height: 20, width: "auto", objectFit: "contain" }}
     />
+  );
+}
+
+function SafeZoneGuide() {
+  return (
+    <div
+      data-export-hide="true"
+      style={{
+        position: "absolute",
+        left: SAFE_BR.x,
+        top: SAFE_BR.y,
+        width: SAFE_BR.w,
+        height: SAFE_BR.h,
+        border: "1px dashed rgba(236,106,55,0.7)",
+        background: "rgba(236,106,55,0.08)",
+        pointerEvents: "none",
+        zIndex: 10,
+        boxSizing: "border-box",
+      }}
+    >
+      <span
+        style={{
+          position: "absolute",
+          top: 4,
+          left: 4,
+          fontFamily: FONT_INTER,
+          fontSize: 10,
+          color: "rgba(236,106,55,0.9)",
+          letterSpacing: "0.06em",
+          textTransform: "uppercase",
+        }}
+      >
+        YT Timestamp
+      </span>
+    </div>
   );
 }
 
@@ -400,7 +495,7 @@ function ZahlLayout({ s }: { s: KRThumbState }) {
           alt=""
           style={{
             position: "absolute",
-            right: EDGE_MARGIN,
+            left: EDGE_MARGIN,
             bottom: EDGE_MARGIN,
             width: PHOTO_OPTIONAL_W,
             height: Math.round(PHOTO_OPTIONAL_W * 0.75),
@@ -453,6 +548,7 @@ function ZahlLayout({ s }: { s: KRThumbState }) {
 
 function FaceKeywordLayout({ s }: { s: KRThumbState }) {
   const keywordWords = s.keyword.trim().split(/\s+/).filter(Boolean);
+  // Zweizeiler: erste 2 Wörter off-white, Rest silver (bewusste Design-Entscheidung)
   const line1 = keywordWords.slice(0, 2).join(" ");
   const line2 = keywordWords.slice(2).join(" ");
 
@@ -495,7 +591,7 @@ function FaceKeywordLayout({ s }: { s: KRThumbState }) {
           data-kr-font="keyword"
           style={{
             fontFamily: FONT_DISPLAY,
-            fontSize: 52,
+            fontSize: 64,
             lineHeight: 1.1,
             fontWeight: 400,
             textTransform: "uppercase",
@@ -516,14 +612,17 @@ function FaceKeywordLayout({ s }: { s: KRThumbState }) {
   );
 }
 
-function VorherNachherLayout({ s }: { s: KRThumbState }) {
+function VorherNachherLayout({ s, vnBg }: { s: KRThumbState; vnBg: string }) {
   const centerX = THUMB_W / 2;
   const panelTop = 200;
   const panelHeight = 360;
+  const dark = isDarkVnBg(vnBg);
+  const textColor = dark ? C.offWhite : C.nearBlack;
+  const contextColor = dark ? C.silver : C.nearBlack;
 
   return (
     <>
-      <div style={{ position: "absolute", inset: 0, background: C.offWhite }} />
+      <div style={{ position: "absolute", inset: 0, background: vnBg }} />
       <div
         data-kr-font="headline"
         style={{
@@ -535,7 +634,7 @@ function VorherNachherLayout({ s }: { s: KRThumbState }) {
           fontSize: 40,
           lineHeight: 1.1,
           textTransform: "uppercase",
-          color: C.nearBlack,
+          color: textColor,
         }}
       >
         {s.headline || "VORHER NACHHER"}
@@ -630,7 +729,7 @@ function VorherNachherLayout({ s }: { s: KRThumbState }) {
             top: panelTop + panelHeight + 24,
             fontFamily: FONT_INTER,
             fontSize: 20,
-            color: C.nearBlack,
+            color: contextColor,
           }}
         >
           {s.numberContext}
@@ -668,23 +767,32 @@ function StatementLayout({ s }: { s: KRThumbState }) {
   );
 }
 
-function LayoutCanvas({ s }: { s: KRThumbState }) {
-  switch (s.layout) {
-    case "split":
-      return <SplitLayout s={s} />;
-    case "zahl":
-      return <ZahlLayout s={s} />;
-    case "face-keyword":
-      return <FaceKeywordLayout s={s} />;
-    case "vorher-nachher":
-      return <VorherNachherLayout s={s} />;
-    case "statement":
-      return <StatementLayout s={s} />;
-    default: {
-      const _exhaustive: never = s.layout;
-      return _exhaustive;
+function LayoutCanvas({ s, vnBg, showSafeZoneGuide }: { s: KRThumbState; vnBg: string; showSafeZoneGuide: boolean }) {
+  const layout = (() => {
+    switch (s.layout) {
+      case "split":
+        return <SplitLayout s={s} />;
+      case "zahl":
+        return <ZahlLayout s={s} />;
+      case "face-keyword":
+        return <FaceKeywordLayout s={s} />;
+      case "vorher-nachher":
+        return <VorherNachherLayout s={s} vnBg={vnBg} />;
+      case "statement":
+        return <StatementLayout s={s} />;
+      default: {
+        const _exhaustive: never = s.layout;
+        return _exhaustive;
+      }
     }
-  }
+  })();
+
+  return (
+    <>
+      {layout}
+      {showSafeZoneGuide && <SafeZoneGuide />}
+    </>
+  );
 }
 
 function needsHeadline(layout: ThumbLayout): boolean {
@@ -705,6 +813,8 @@ export default function KevinRitzThumbnailGenerator() {
   const [exporting, setExporting] = useState(false);
   const [exportFeedback, setExportFeedback] = useState<string | null>(null);
   const [scale, setScale] = useState(0.5);
+  const [showSafeZoneGuide, setShowSafeZoneGuide] = useState(true);
+  const [vnResolvedBg, setVnResolvedBg] = useState<string>(C.offWhite);
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const thumbRef = useRef<HTMLDivElement>(null);
@@ -715,6 +825,10 @@ export default function KevinRitzThumbnailGenerator() {
 
   const headlineWords = wordCount(s.headline);
   const headlineWarn = headlineWords > 5;
+  const keywordWords = wordCount(s.keyword);
+  const keywordWarn = keywordWords > 3;
+
+  const canvasBg = exportBg(s.layout, vnResolvedBg);
 
   useEffect(() => {
     if (!wrapRef.current) return;
@@ -722,6 +836,14 @@ export default function KevinRitzThumbnailGenerator() {
     ro.observe(wrapRef.current);
     return () => ro.disconnect();
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    resolveVnBackground(s).then(bg => {
+      if (!cancelled) setVnResolvedBg(bg);
+    });
+    return () => { cancelled = true; };
+  }, [s]);
 
   async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>, slot: 1 | 2) {
     const file = e.target.files?.[0];
@@ -745,7 +867,7 @@ export default function KevinRitzThumbnailGenerator() {
       if (s.photoUrl) preloads.push(preloadImage(s.photoUrl));
       if (s.photoUrl2) preloads.push(preloadImage(s.photoUrl2));
       await Promise.allSettled(preloads);
-      const blob = await captureThumbnail(el, wrapRef.current, exportBg(s.layout));
+      const blob = await captureThumbnail(el, wrapRef.current, canvasBg);
       downloadBlob(blob, `KR_Thumbnail_${s.layout}.png`);
     } catch (err) {
       setExportFeedback(exportErrorMessage(err));
@@ -825,7 +947,14 @@ export default function KevinRitzThumbnailGenerator() {
           )}
 
           {s.layout === "face-keyword" && (
-            <Field label="Keyword (max 3 Wörter)">
+            <Field label={
+              <>
+                Keyword
+                <span style={{ marginLeft: 6, fontSize: "0.75rem", color: keywordWarn ? "#c9a84c" : "var(--text-muted)", textTransform: "none", fontStyle: "italic" }}>
+                  {keywordWords}/3 Wörter{keywordWarn ? " · zu lang" : ""}
+                </span>
+              </>
+            }>
               <input
                 className="cms-input"
                 value={s.keyword}
@@ -846,11 +975,38 @@ export default function KevinRitzThumbnailGenerator() {
             </>
           )}
 
-          {s.layout === "vorher-nachher" && s.numberContext !== undefined && (
-            <Field label="Transformation (optional)">
-              <input className="cms-input" value={s.numberContext} onChange={e => patch({ numberContext: e.target.value })} placeholder="10h → 1h" />
-            </Field>
+          {s.layout === "vorher-nachher" && (
+            <>
+              <div>
+                <div className="cms-label">Hintergrund</div>
+                <div className="flex flex-wrap gap-1">
+                  {(Object.keys(VN_BG_LABELS) as VnBackground[]).map(bg => (
+                    <LayoutTab
+                      key={bg}
+                      active={s.vnBackground === bg}
+                      onClick={() => patch({ vnBackground: bg })}
+                    >
+                      {VN_BG_LABELS[bg]}
+                    </LayoutTab>
+                  ))}
+                </div>
+              </div>
+              <Field label="Transformation (optional)">
+                <input className="cms-input" value={s.numberContext} onChange={e => patch({ numberContext: e.target.value })} placeholder="10h → 1h" />
+              </Field>
+            </>
           )}
+
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-2 cursor-pointer text-sm" style={{ fontFamily: "var(--font-eb-garamond)", color: "var(--text-secondary)" }}>
+              <input
+                type="checkbox"
+                checked={showSafeZoneGuide}
+                onChange={e => setShowSafeZoneGuide(e.target.checked)}
+              />
+              Safe Zone anzeigen
+            </label>
+          </div>
 
           {needsPhoto1(s.layout) && (
             <PhotoField
@@ -887,7 +1043,7 @@ export default function KevinRitzThumbnailGenerator() {
 
         {/* ── PREVIEW ──────────────────────────────────────── */}
         <div className="flex-1 min-w-0">
-          <div className="rounded-sm overflow-hidden" style={{ border: "1px solid var(--border)", background: exportBg(s.layout) }}>
+          <div className="rounded-sm overflow-hidden" style={{ border: "1px solid var(--border)", background: canvasBg }}>
 
             <div ref={wrapRef} style={{ width: "100%", aspectRatio: "16/9", overflow: "hidden", position: "relative" }}>
 
@@ -901,17 +1057,17 @@ export default function KevinRitzThumbnailGenerator() {
                   position: "absolute",
                   top: 0,
                   left: 0,
-                  background: exportBg(s.layout),
+                  background: canvasBg,
                   overflow: "hidden",
                 }}
               >
-                <LayoutCanvas s={s} />
+                <LayoutCanvas s={s} vnBg={vnResolvedBg} showSafeZoneGuide={showSafeZoneGuide} />
               </div>
             </div>
           </div>
 
           <p style={{ marginTop: 6, textAlign: "right", fontFamily: "var(--font-eb-garamond)", fontStyle: "italic", fontSize: "0.8rem", color: "var(--text-muted)" }}>
-            Vorschau skaliert · Export immer 1280 × 720 px · Safe Zone unten rechts frei
+            Vorschau skaliert · Export 1280 × 720 px · Safe-Zone-Guide erscheint nicht im PNG
           </p>
         </div>
       </div>

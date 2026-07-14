@@ -37,7 +37,7 @@ const DEFAULT: RaisPostState = {
   imagePos: { x: 700, y: 80 },
 };
 
-const LOGO_SRC = "/brand/rais-logo.png";
+const LOGO_SRC = "/brand/RAIS_pictogram.svg";
 const FOOTER_TEXT = "KI als Hebel für Ihr Maklerbüro | ritz-ai.solutions";
 const EXPORT_TIMEOUT_MS = 30_000;
 const MAX_IMAGE_PX = 2560;
@@ -46,8 +46,8 @@ const PADDING = 80;
 const BORDER_INSET = 24;
 const IMAGE_W = 300;
 const IMAGE_H = 380;
-const LOGO_W = 128;
-const LOGO_H = 80;
+const LOGO_W = 72;
+const LOGO_H = 72;
 const FOOTER_ZONE_H = 140;
 const TEXT_FONT_STEPS = [54, 44, 36, 30] as const;
 const TEXT_LINE_HEIGHT = 1.25;
@@ -59,8 +59,11 @@ const FONT_SERIF = "Baskerville, 'Palatino Linotype', Palatino, serif";
 const FONT_INTER = "var(--font-inter), Inter, sans-serif";
 
 const COLORS = {
+  cloud: "#F5F2EC",
   linen: "#FBF8F3",
+  orange: "#EC6A37",
   sage: "#789464",
+  pistachio: "#3C5A2A",
   charcoal: "#2F2A24",
   stone: "#7B746B",
   border: "#D9D1C7",
@@ -277,6 +280,22 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
+function renderKickerText(kicker: string) {
+  const parts = kicker.split("·");
+  if (parts.length < 2) {
+    return kicker;
+  }
+  const before = parts.slice(0, -1).join("·").trimEnd();
+  const after = parts[parts.length - 1].trim();
+  return (
+    <>
+      {before}
+      <span style={{ color: COLORS.stone }}> · </span>
+      <span style={{ color: COLORS.orange }}>{after}</span>
+    </>
+  );
+}
+
 function RaisLogo() {
   const [failed, setFailed] = useState(false);
 
@@ -293,10 +312,10 @@ function RaisLogo() {
           justifyContent: "center",
           background: COLORS.linen,
           fontFamily: FONT_INTER,
-          fontSize: 18,
+          fontSize: 12,
           fontWeight: 500,
-          color: COLORS.stone,
-          letterSpacing: "0.12em",
+          color: COLORS.orange,
+          letterSpacing: "0.08em",
         }}
       >
         RAIS
@@ -470,7 +489,7 @@ export default function RaisPostGenerator() {
   const dragStyle = (target: DragTarget): React.CSSProperties => ({
     cursor: exporting ? "default" : activeDrag === target ? "grabbing" : "grab",
     outline: hoverTarget === target || activeDrag === target
-      ? `1px dashed ${COLORS.sage}`
+      ? `1px dashed ${COLORS.orange}`
       : "1px dashed transparent",
     outlineOffset: 4,
     touchAction: "none",
@@ -636,13 +655,13 @@ export default function RaisPostGenerator() {
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {s.kicker}
+                    {renderKickerText(s.kicker)}
                   </div>
                   <div
                     style={{
                       width: 64,
                       height: 4,
-                      background: COLORS.sage,
+                      background: COLORS.orange,
                       marginTop: 16,
                     }}
                   />
@@ -703,11 +722,12 @@ export default function RaisPostGenerator() {
                     aria-hidden
                     style={{
                       position: "absolute",
-                      left: -8,
-                      top: -20,
+                      left: -4,
+                      top: -72,
+                      display: "block",
                       fontFamily: FONT_SERIF,
                       fontSize: 120,
-                      lineHeight: 1,
+                      lineHeight: 0.8,
                       color: COLORS.sage,
                       opacity: 0.45,
                       zIndex: 0,
