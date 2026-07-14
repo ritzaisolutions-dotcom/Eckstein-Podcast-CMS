@@ -44,6 +44,13 @@
   --rais-charcoal: #2F2A24;
   --rais-stone: #7B746B;
   --rais-border: #D9D1C7;
+
+  /* Kevin Ritz thumbnail */
+  --kr-racing-green: #1B4A3D;
+  --kr-silver: #B8BCC0;
+  --kr-near-black: #0A0A0A;
+  --kr-dark-grey: #2E2E2E;
+  --kr-off-white: #F2F1ED;
 }
 
 @theme inline {

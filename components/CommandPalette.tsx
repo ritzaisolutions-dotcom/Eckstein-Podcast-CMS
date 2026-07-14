@@ -15,6 +15,7 @@ const COMMANDS: Command[] = [
   { label: "Thumbnail Generator", description: "YouTube-Template · 1280×720 PNG", icon: "◧", href: "/thumbnail" },
   { label: "Infobox Generator", description: "CapCut-Overlays · PNG transparent", icon: "◈", href: "/infobox" },
   { label: "RAIS Post", description: "Social Post · 1080×1080 PNG", icon: "◫", href: "/rais-post" },
+  { label: "KR Thumbnail", description: "kevin_ritz · 5 Layouts · 1280×720 PNG", icon: "▣", href: "/kr-thumbnail" },
 ];
 
 function fuzzy(query: string, commands: Command[]) {
